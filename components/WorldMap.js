@@ -1,7 +1,17 @@
 "use client";
-import {useEffect,useRef,useState} from "react";
+
+import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
-import {ASSET,PLACE_TYPES} from "@/lib/catalog.mjs";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { ASSET, PLACE_TYPES } from "@/lib/catalog.mjs";
+
+// Tetapkan lokasi worker sebelum membuat instance peta.
+maplibregl.setWorkerUrl(
+  new URL(
+    "maplibre-gl/dist/maplibre-gl-worker.mjs",
+    import.meta.url
+  ).toString()
+);
 
 const STYLE={version:8,sources:{osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'}},layers:[{id:"base",type:"raster",source:"osm",paint:{"raster-saturation":-0.45,"raster-contrast":-0.1}}]};
 export default function WorldMap({locations,position,route,selectedId,onSelect,onPick,placing,apiRef,moving,visits,focusRequest}){
