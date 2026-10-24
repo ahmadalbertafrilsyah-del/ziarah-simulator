@@ -1,0 +1,32 @@
+const paths={
+ compass:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm4 5-2.5 5.5L8 16l2.5-5.5Z",
+ map:"m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Zm6-3v15m6-12v15",
+ pin:"M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0ZM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z",
+ plus:"M12 5v14M5 12h14",check:"m5 12 4 4L19 6",close:"m6 6 12 12M6 18 18 6",
+ chevron:"m9 5 7 7-7 7",down:"m6 9 6 6 6-6",up:"m6 15 6-6 6 6",arrow:"M4 12h16m-6-6 6 6-6 6",
+ route:"M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm12 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM9 6h6a4 4 0 0 1 0 8H9a3 3 0 0 0 0 6h6",
+ users:"M9 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 4v3",
+ fuel:"M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16M2 21h15M5 7h9M15 11h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3",
+ sun:"M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5",
+ moon:"M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z",
+ book:"M12 6C8 3 4 3 2 4v15c3-1 6-1 10 2 4-3 7-3 10-2V4c-3-1-6-1-10 2ZM12 6v15",
+ bag:"M4 9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2ZM9 7V5a3 3 0 0 1 6 0v2M4 13h16",
+ wallet:"M20 8V5a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v12H5a3 3 0 0 1-3-3V6M20 12h-5v5h5",
+ save:"M20 21H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h13l4 4v13a1 1 0 0 1-1 1ZM7 3v6h10V3M7 21v-7h10v7",
+ play:"m8 4 13 8-13 8Z",pause:"M8 4v16M16 4v16",
+ clock:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 7v6l4 2",
+ landmark:"m3 8 9-5 9 5M3 21h18M5 9v9m7-9v9m7-9v9M2 8h20",
+ wrench:"M21 4a6 6 0 0 1-7.8 7.8L5 20a2.1 2.1 0 0 1-3-3l8.2-8.2A6 6 0 0 1 18 1l-4 4 5 3Z",
+ bed:"M3 4v17M21 21V11a2 2 0 0 0-2-2H3M3 17h18M7 9V6h6v3",
+ coffee:"M4 8h13v8a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5ZM17 9h1a3 3 0 1 1 0 6h-1M7 2v3m5-3v3",
+ store:"m3 3-1 6a3 3 0 0 0 5 2 3 3 0 0 0 5 0 3 3 0 0 0 5 0 3 3 0 0 0 5-2l-1-6ZM4 12v9h16v-9M9 21v-6h6v6",
+ edit:"m16 3 5 5L8 21H3v-5ZM13 6l5 5",download:"M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5",
+ upload:"M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5",trash:"M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7",
+ search:"M10.5 3a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15ZM16 16l5 5",
+ heart:"M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z",
+ info:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 11v6M12 7h.01",
+ target:"M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14ZM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM12 1v4m0 14v4M1 12h4m14 0h4",
+ external:"M15 3h6v6m0-6L11 13M10 3H3v18h18v-7"
+};
+export default function Icon({name,size=20,...props}){return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}><path d={paths[name]||paths.compass}/></svg>;}
+
