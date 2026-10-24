@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import {itineraryMapRoute} from "@/lib/itinerary.mjs";
 import { ASSET, CHARACTERS } from "@/lib/catalog.mjs";
 import { SEED_LOCATIONS } from "@/lib/locations.mjs";
 import {
@@ -12,7 +13,18 @@ import {
 } from "@/lib/party.mjs";
 
 import Icon from "./Icon";
+import MaintenancePanel from "./MaintenancePanel";
+import {serviceAccess} from "@/lib/route-facilities.mjs";
+
+import { clockLabel, CAPACITY } from "@/lib/travel-resources.mjs";
+import { distanceLabel } from "@/lib/catalog.mjs";
+import { useJourney } from "./useJourney";
 import Modal from "./Modal";
+import LocationForm from "./LocationForm";
+import {ItineraryPlanner,ItinerarySummary,BackupPanel} from "./JourneyTools";
+import {PlaceProfile,JournalPanel,CustomLocationsPanel} from "./ZiarahPanels";
+
+const RouteSimulator = dynamic(() => import("./RouteSimulator"), { ssr: false });
 
 const WorldMap = dynamic(() => import("./WorldMap"), {
   ssr: false,
@@ -55,7 +67,7 @@ const START = SEED_LOCATIONS.find(
   (place) => place.id === "sunan-ampel"
 );
 
-const NO_VISITS = [];
+
 
 function PartyPicker({ initial, onSave }) {
   const [ids, setIds] = useState(initial);
@@ -172,19 +184,62 @@ export default function Game() {
   );
 
   const [modal, setModal] = useState(null);
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
+  const [profileId,setProfileId]=useState("sunan-giri");
+  const [locationDraft,setLocationDraft]=useState(null);
+  const [placing,setPlacing]=useState(false);
   const [selectedId, setSelectedId] = useState("sunan-giri");
   const [toast, setToast] = useState("");
   const [focusRequest, setFocusRequest] = useState(null);
 
   const mapApi = useRef(null);
 
-  const selected =
-    SEED_LOCATIONS.find((place) => place.id === selectedId) ||
-    START;
-
   const ready = isValidParty(party);
+  const journey = useJourney(START);
+  const mapRoute=useMemo(()=>itineraryMapRoute({route:journey.route,itinerary:journey.itinerary}),[journey.route,journey.itinerary]);
+  const selected = journey.destination || journey.locations.find(place=>place.id===selectedId) || START;
+  const locked = journey.status === "moving" || journey.status === "paused";
+
+  function openProfile(id){setProfileId(id);setModal('profile');}
+  function addLocation(){setLocationDraft(null);setModal('location-form');}
+  function saveLocation(place){const result=journey.saveLocation(place);if(result.ok){journey.clearRoute();setSelectedId(place.id);setModal(null);setToast(result.message);setFocusRequest({coordinates:place.coordinates,zoom:13,nonce:Date.now()});}return result;}
+  function pickLocation(coordinates){if(!placing)return;setLocationDraft(d=>({...d,coordinates}));setPlacing(false);setModal('location-form');}
+  function destinationProfile(){journey.pause();journey.save();setSimulatorOpen(false);openProfile(journey.destination.id);}
+
+  function nextDestination(){const r=journey.nextStop();if(r.ok){setSimulatorOpen(false);setModal(null);}setToast(r.message);}
+  function restoredProgress(r){setParty(r.party);setSaveStatus(r.party.length?'Pilihan tersimpan':'Belum memilih karakter');setSimulatorOpen(false);setModal(null);setPlacing(false);setSelectedId('sunan-giri');setFocusRequest({coordinates:r.origin.coordinates,zoom:12,nonce:Date.now()});setToast(r.message);}
+
+  function selectDestination(id) {
+    if (locked) {
+      setToast("Selesaikan perjalanan aktif sebelum mengganti tujuan.");
+      return;
+    }
+    journey.clearRoute();
+    setSelectedId(id);
+  }
+
+  function depart() {
+    if (!ready) { setModal("party"); return; }
+    journey.start(party);
+    setSimulatorOpen(true);
+  }
+
+  const pauseJourney = journey.pause;
+  const journeyStatus = journey.status;
+  const arrivedName = journey.destination?.name;
+  useEffect(() => {
+    if (journeyStatus !== "arrived") return;
+    const timer = setTimeout(() => setToast(`Tiba di ${arrivedName}. Buka profil untuk mencatat kunjungan atau siapkan tujuan berikutnya.`), 0);
+    return () => clearTimeout(timer);
+  }, [journeyStatus, arrivedName]);
 
   useEffect(() => {
+    if (modal) pauseJourney();
+  }, [modal, pauseJourney]);
+
+  useEffect(() => {
+    // Restore browser-only storage after mount; intentionally synchronizes React state.
+    /* eslint-disable react-hooks/set-state-in-effect */
     try {
       const raw = localStorage.getItem(PARTY_STORAGE_KEY);
       const saved = raw ? parseParty(raw) : null;
@@ -204,6 +259,7 @@ export default function Game() {
     }
 
     setLoaded(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   useEffect(() => {
@@ -245,7 +301,7 @@ export default function Game() {
 
     setToast(
       "Dua karakter siap menemani perjalanan. " +
-        "Klik Mainkan arena latihan untuk mencoba dua kamera."
+        "Hitung rute jalan, lalu klik Berangkat."
     );
   }
 
@@ -258,6 +314,14 @@ export default function Game() {
 
   // Diletakkan setelah seluruh hook agar urutan hook tetap konsisten.
   // State pilihan karakter tetap dipertahankan saat kembali ke menu.
+  if (simulatorOpen && journey.route && journey.driver && isValidParty(journey.party)) {
+    return <RouteSimulator route={journey.route} destination={journey.destination}
+      initialDriver={journey.driver} party={journey.party} status={journey.status}
+      onProgress={journey.report} onPause={journey.pause} onService={action=>journey.service(action,party)}
+      onResume={()=>journey.start(party)} onProfile={destinationProfile}
+      itinerary={journey.itinerary} onNext={journey.itinerary&&journey.itinerary.index+1<journey.itinerary.stopIds.length?nextDestination:undefined}
+      onExit={()=>{journey.pause();journey.save();setSimulatorOpen(false);}} />;
+  }
   if (modal === "drive" && ready) {
     return (
       <DrivingScene
@@ -305,9 +369,10 @@ export default function Game() {
 
           <button
             type="button"
-            disabled
-            title="Jurnal tersedia pada tahap berikutnya"
-            aria-label="Jurnal, tahap berikutnya"
+            disabled={!journey.hydrated}
+            onClick={()=>setModal("journal")}
+            title="Jurnal kunjungan"
+            aria-label="Buka jurnal"
           >
             <Icon name="book" size={22} />
             <span>Jurnal</span>
@@ -315,12 +380,13 @@ export default function Game() {
 
           <button
             type="button"
-            disabled
-            title="Bekal tersedia pada tahap berikutnya"
-            aria-label="Bekal, tahap berikutnya"
+            disabled={!journey.hydrated}
+            onClick={()=>setModal("backup")}
+            title="Cadangan progres"
+            aria-label="Buka cadangan progres"
           >
             <Icon name="bag" size={22} />
-            <span>Bekal</span>
+            <span>Cadangan</span>
           </button>
         </div>
 
@@ -334,7 +400,7 @@ export default function Game() {
           <Icon name="info" size={22} />
         </button>
 
-        <span className="rail-version">V 0.2</span>
+        <span className="rail-version">V 0.11</span>
       </aside>
 
       <div className="app-content">
@@ -352,7 +418,7 @@ export default function Game() {
 
           <div className="topbar-actions">
             <span className="prototype-badge">
-              DUA KAMERA
+              SIMULATOR RUTE
             </span>
 
             <span className="save-indicator" role="status">
@@ -392,9 +458,9 @@ export default function Game() {
                 </span>
 
                 <span>
-                  <small>Waktu awal perjalanan</small>
+                  <small>Waktu permainan</small>
                   <strong>
-                    09:00 <em>Hari ke-1</em>
+                    {clockLabel(journey.resources.clock)}
                   </strong>
                 </span>
               </div>
@@ -405,8 +471,8 @@ export default function Game() {
                 </span>
 
                 <span>
-                  <small>Bekal awal</small>
-                  <strong>Rp450.000</strong>
+                  <small>Bekal perjalanan</small>
+                  <strong>Rp{journey.resources.money.toLocaleString("id-ID")}</strong>
                 </span>
               </div>
             </div>
@@ -455,24 +521,25 @@ export default function Game() {
                 </div>
               </div>
 
-              <div className="map-stage">
+              {placing&&<div className="location-pick-note" role="status">Klik titik pada peta untuk menentukan koordinat maqbarah.<button className="text-button" onClick={()=>{setPlacing(false);setModal('location-form');}}>Batal memilih titik</button></div>}
+              <div className={"map-stage"+(placing?" is-placing":"")}>
                 <WorldMap
-                  locations={SEED_LOCATIONS}
-                  position={START.coordinates}
-                  route={null}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                  onPick={() => {}}
-                  placing={false}
+                  locations={journey.locations}
+                  position={journey.position}
+                  route={mapRoute}
+                  selectedId={selected.id}
+                  onSelect={selectDestination}
+                  onPick={pickLocation}
+                  placing={placing}
                   apiRef={mapApi}
-                  moving={false}
-                  visits={NO_VISITS}
+                  moving={journey.status === "moving"}
+                  visits={journey.visits}
                   focusRequest={focusRequest}
                 />
 
                 <div className="map-caption">
                   <span className="status-dot" />
-                  Titik awal · Sunan Ampel, Surabaya
+                  {journey.status === "moving" ? "Vespa sedang dalam perjalanan" : journey.status === "paused" ? "Perjalanan dijeda" : `Posisi · ${journey.origin.name}`}
                 </div>
 
                 <div className="map-legend">
@@ -504,10 +571,8 @@ export default function Game() {
                   </div>
 
                   <span className="map-location-number">
-                    {String(
-                      SEED_LOCATIONS.indexOf(selected) + 1
-                    ).padStart(2, "0")}
-                    <small>/09</small>
+                    {selected.custom?"+":String(SEED_LOCATIONS.findIndex(p=>p.id===selected.id)+1).padStart(2,"0")}
+                    <small>{selected.custom?'TAMBAHAN':'/09'}</small>
                   </span>
                 </div>
               </div>
@@ -521,9 +586,58 @@ export default function Game() {
                 <span className="section-kicker">
                   MULAI BERMAIN
                 </span>
-                <h2>Berdua, lebih bermakna.</h2>
+                <h2>Tujuan berikutnya.</h2>
                 <p>Satu Vespa, dua teman perjalanan.</p>
               </div>
+
+              <section className="journey-panel" aria-label="Kontrol perjalanan">
+                <label htmlFor="destination">Tujuan maqbarah</label>
+                <select id="destination" value={selected.id} disabled={locked}
+                  onChange={(event) => selectDestination(event.target.value)}>
+                  {journey.locations.map((place) => (
+                    <option key={place.id} value={place.id} disabled={place.id === journey.origin.id}>
+                      {place.name}{place.custom?" (tambahan)":""}{place.id === journey.origin.id ? " (posisi saat ini)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="small muted">Dari {journey.origin.name} · <button type="button" className="text-button" onClick={()=>openProfile(journey.origin.id)}>Profil posisi saat ini</button></p>
+                <div className="ziarah-buttons"><button type="button" className="button secondary" onClick={()=>openProfile(selected.id)}>Profil tujuan</button><button type="button" className="button secondary" disabled={!journey.hydrated||locked} onClick={addLocation}>Tambah maqbarah</button></div>
+                <div className="ziarah-buttons"><button type="button" className="button secondary" disabled={!journey.hydrated} onClick={()=>setModal('locations')}>Kelola lokasi</button><button type="button" className="button secondary" disabled={!journey.hydrated} onClick={()=>setModal('journal')}>Jurnal kunjungan</button></div>
+                <button type="button" className="button secondary full-width"
+                  disabled={!loaded || !journey.hydrated || locked || journey.status === "loading" || selected.id === journey.origin.id}
+                  onClick={() => journey.plan(selected)}>
+                  {journey.status === "loading" ? "Menghitung rute…" : journey.status === "error" ? "Coba hitung lagi" : "Hitung rute jalan"}
+                </button>
+                <button type="button" className="button secondary full-width" disabled={!journey.hydrated||journey.status==='loading'} onClick={()=>setModal('itinerary')}>Susun rangkaian tujuan</button>
+                <ItinerarySummary journey={journey} onNext={nextDestination}/>
+                {journey.error && <p role="alert" className="journey-error">{journey.error}</p>}
+                {journey.route && <>
+                  <div className="journey-metrics">
+                    <div><small>{journey.itinerary?'Jarak ruas aktif':'Jarak rute'}</small><strong>{distanceLabel(journey.route.distanceM)}</strong></div>
+                    <div><small>Jarak tersisa</small><strong>{distanceLabel(journey.remaining)}</strong></div>
+                  </div>
+                  <progress className="journey-progress" max={journey.route.distanceM} value={journey.traveled} aria-label="Kemajuan perjalanan" />
+                  <p className="small muted">{journey.route.source} · Estimasi jalan {Math.ceil(journey.route.durationSec / 60)} menit</p>
+                </>}
+                <p className="small muted">Berangkat membuka simulator manual. Gunakan gas, rem, kemudi kiri/kanan dan mundur. Jalan mengikuti rute terpilih; bangunan sekitar berupa ilustrasi.</p>
+                {journey.resources.breakdown&&<p className="journey-error" role="alert">{journey.resources.breakdown.type==='tyre'?'Ban bocor':'Busi mati'}. Buka Inventaris & kondisi kendaraan untuk memperbaiki.</p>}
+                <details><summary>Inventaris & kondisi kendaraan</summary><MaintenancePanel resources={journey.resources} onAction={action=>journey.service(action,party)} disabled={!ready||!journey.hydrated||journey.status==='moving'} canBuy={serviceAccess(journey,'buy-tyre').allowed} /></details>
+                <section className="travel-services" aria-label="Bekal dan layanan simulasi">
+                 <p>Bensin {journey.resources.fuel.toFixed(2)} L · {clockLabel(journey.resources.clock)}</p>
+                 <p>Energi {party.map(id=>`${CHARACTERS.find(c=>c.id===id)?.name}: ${Math.round(journey.resources.energy[id])}%`).join(' · ') || 'Pilih dua karakter dahulu'}</p>
+                 <button type="button" className="button secondary" disabled={!ready||!journey.hydrated||!serviceAccess(journey,'fuel').allowed} onClick={()=>setToast(journey.service('fuel',party).message)}>Isi bensin 1 L · Rp10.000</button>
+                 <button type="button" className="button secondary" disabled={!ready||!journey.hydrated||!serviceAccess(journey,'rest').allowed} onClick={()=>setToast(journey.service('rest',party).message)}>Istirahat di tempat singgah</button>
+                 <button type="button" className="button secondary" disabled={!ready||!journey.hydrated||journey.resources.fuel>1e-9} onClick={()=>setToast(journey.service('help',party).message)}>Panggil bantuan bensin</button>
+                 <button type="button" className="button secondary" disabled={!ready||!journey.hydrated||!party.some(id=>journey.resources.energy[id]<=0)} onClick={()=>setToast(journey.service('rest-help',party).message)}>Bantuan istirahat darurat</button>
+                 <small>Pos persiapan melayani sebelum berangkat dan setelah tiba. Selama perjalanan, berhenti dekat fasilitas yang sesuai. Biaya merupakan aturan simulasi.</small>
+                </section>
+                <p className="small muted" role="status">{journey.storageNote || "Kemajuan disimpan otomatis setiap dua detik."}</p>
+                {locked && <button type="button" className="button secondary" onClick={()=>{journey.cancel();setToast("Perjalanan dibatalkan. Kembali ke titik keberangkatan.");}}>Batalkan & kembali ke titik keberangkatan</button>}
+                <div className="journey-status" role="status">
+                  {{idle:"Pilih tujuan, lalu hitung rute.",loading:"Sedang meminta rute jalan…",ready: ready ? "Rute siap. Silakan berangkat." : "Rute siap. Pilih dua karakter lalu berangkat.",moving:"Sedang berkendara",paused:"Perjalanan dijeda",arrived:`Tiba di ${journey.destination?.name || "tujuan"}`,error:"Rute gagal dihitung. Silakan coba lagi."}[journey.status]}
+                </div>
+                {journey.visits.length > 0 && <p className="small">Catatan kedatangan: {journey.visits.length} maqbarah.</p>}
+              </section>
 
               <div className="welcome-illustration">
                 <span className="illustration-halo" />
@@ -566,9 +680,9 @@ export default function Game() {
                 <div className="setup-step">
                   <span>02</span>
                   <div>
-                    <strong>Coba arena latihan</strong>
+                    <strong>Hitung rute jalan</strong>
                     <small>
-                      Gas, rem, belok, dan mundur
+                      Pilih maqbarah tujuan perjalanan
                     </small>
                   </div>
                 </div>
@@ -576,31 +690,23 @@ export default function Game() {
                 <div className="setup-step">
                   <span>03</span>
                   <div>
-                    <strong>Pilih sudut kamera</strong>
+                    <strong>Berangkat dan pantau</strong>
                     <small>
-                      Belakang atau atas, ganti saat bermain
+                      Jeda, lanjutkan, dan tiba di tujuan
                     </small>
                   </div>
                 </div>
               </div>
 
               <div className="departure-panel">
-                <button
-                  type="button"
-                  className="button primary departure-button"
-                  disabled={!loaded}
-                  onClick={startPractice}
-                >
-                  <Icon
-                    name={ready ? "play" : "users"}
-                    size={18}
-                  />
-
-                  {ready
-                    ? "Mainkan arena latihan"
-                    : "Pilih 2 karakter"}
-
-                  <Icon name="arrow" size={18} />
+                <button type="button" className="button primary departure-button"
+                  disabled={!loaded || !journey.hydrated || !!journey.resources.breakdown || (ready && !["ready", "moving", "paused"].includes(journey.status))}
+                  onClick={() => journey.status === "moving" ? journey.pause() : depart()}>
+                  <Icon name="play" size={18} />
+                  {!ready ? "Pilih 2 karakter" : journey.status === "moving" ? "Jeda" : journey.status === "paused" ? "Lanjutkan" : "Berangkat"}
+                </button>
+                <button type="button" className="button secondary full-width" disabled={!loaded || locked} onClick={startPractice}>
+                  Buka arena latihan
                 </button>
 
                 {ready && (
@@ -728,7 +834,7 @@ export default function Game() {
               <div className="card-title">
                 <h2>
                   <Icon name="fuel" size={18} />
-                  Vespa & bekal awal
+                  Vespa & bekal perjalanan
                 </h2>
 
                 <span className="mini-badge">
@@ -746,14 +852,14 @@ export default function Game() {
                 <div>
                   <div className="meter">
                     <div>
-                      <span>Bahan bakar awal</span>
-                      <strong>4,0 / 5,5 L</strong>
+                      <span>Bahan bakar tersisa</span>
+                      <strong>{journey.resources.fuel.toFixed(2)} / {CAPACITY} L</strong>
                     </div>
 
                     <progress
                       max="5.5"
-                      value="4"
-                      aria-label="Bahan bakar awal"
+                      value={journey.resources.fuel}
+                      aria-label="Bahan bakar tersisa"
                     />
                   </div>
 
@@ -801,7 +907,7 @@ export default function Game() {
                     aria-label={`Lihat ${place.name}`}
                     title={place.name}
                     onClick={() => {
-                      setSelectedId(place.id);
+                      selectDestination(place.id);
 
                       setFocusRequest({
                         coordinates: place.coordinates,
@@ -863,10 +969,17 @@ export default function Game() {
         </Modal>
       )}
 
+      {modal==='itinerary'&&<Modal title="Rangkaian tujuan" onClose={()=>setModal(null)}><ItineraryPlanner journey={journey} selectedId={selected.id} onPlanned={message=>{setModal(null);setToast(message);}}/></Modal>}
+      {modal==='backup'&&<Modal title="Cadangan progres" onClose={()=>setModal(null)}><BackupPanel journey={journey} party={party} start={START} onRestored={restoredProgress}/></Modal>}
+      {modal==='profile'&&journey.locations.some(p=>p.id===profileId)&&<Modal title="Profil maqbarah" onClose={()=>setModal(null)}><PlaceProfile key={profileId} place={journey.locations.find(p=>p.id===profileId)} journey={journey} party={party}/></Modal>}
+      {modal==='journal'&&<Modal title="Jurnal kunjungan" onClose={()=>setModal(null)}><JournalPanel journey={journey} onProfile={openProfile}/></Modal>}
+      {modal==='locations'&&<Modal title="Lokasi ziarah tambahan" onClose={()=>setModal(null)}><CustomLocationsPanel journey={journey} onAdd={addLocation} onEdit={p=>{setLocationDraft(p);setModal('location-form');}} onProfile={openProfile}/></Modal>}
+      {modal==='location-form'&&<Modal title={journey.customLocations.some(p=>p.id===locationDraft?.id)?'Edit maqbarah':'Tambah maqbarah'} onClose={()=>setModal(null)}><LocationForm initial={locationDraft} onSave={saveLocation} onCancel={()=>setModal(null)} onPickMap={draft=>{setLocationDraft(draft);setModal(null);setPlacing(true);}}/></Modal>}
+
       {modal === "help" && (
         <Modal
           title="Saatnya mencoba Vespa"
-          intro="Simulator Ziarah Walisongo · Dua kamera"
+          intro="Simulator Ziarah Walisongo · Profil dan jurnal"
           onClose={() => setModal(null)}
         >
           <ol className="help-steps">
@@ -911,14 +1024,11 @@ export default function Game() {
 
           <p className="notice">
             Arena latihan memakai jalan fiktif dan model
-            geometris sederhana. Rute nyata pada peta
-            Indonesia, penambahan maqbarah, jurnal, bahan
-            bakar, serta kejadian perjalanan belum
-            dihubungkan ke arena ini.
+            geometris sederhana. Simulator manual menuju maqbarah dibuka melalui panel tujuan. Profil, jurnal, lokasi tambahan, bahan bakar, serta kejadian perjalanan tersedia pada perjalanan rute. Susun beberapa tujuan melalui Rangkaian tujuan. Cadangan progres dapat diunduh dan dipulihkan melalui menu Cadangan. Catat kunjungan melalui profil saat berada di dekat maqbarah. Lokasi tambahan dapat diisi melalui koordinat atau titik pada peta.
           </p>
 
           <p className="muted small">
-            Pilihan karakter dan kamera disimpan pada
+            Kemajuan perjalanan manual dan kedatangan tersimpan di browser yang sama. Saat dimuat ulang perjalanan dijeda. Pilihan karakter dan kamera disimpan pada
             browser. Posisi dan jarak latihan kembali ke
             awal setelah keluar arena. Peta menu
             membutuhkan internet dan WebGL; arena latihan

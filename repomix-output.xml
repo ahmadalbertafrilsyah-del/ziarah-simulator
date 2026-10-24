@@ -1,0 +1,4594 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+app/
+  api/
+    route/
+      route.js
+  globals.css
+  icon.png
+  layout.js
+  page.js
+components/
+  driving.css
+  DrivingScene.js
+  Game.js
+  Icon.js
+  LocationForm.js
+  Modal.js
+  WorldMap.js
+data/
+  example-route.json
+lib/
+  catalog.mjs
+  driving-scene.mjs
+  game-engine.mjs
+  geo.mjs
+  locations.mjs
+  party.mjs
+public/
+  assets/
+    buildings/
+      bengkel.png
+      hotel.png
+      indomaret.png
+      maqbarah.png
+      masjid.png
+      pasar.png
+      pom_bensin.png
+      rumah_jawa.png
+      warung.png
+    characters/
+      anak_laki_laki_nu.png
+      bapak_batik_peci_nu.png
+      ibu_paruh_baya.png
+      remaja_perempuan_hijau.png
+      remaja_perempuan_terakota.png
+    items/
+      ban_cadangan.png
+      busi.png
+      helm.png
+      jeriken_bensin.png
+      kunci_pas.png
+      obeng.png
+      oli_motor.png
+      pompa_ban.png
+      vespa.png
+  file.svg
+  globe.svg
+  next.svg
+  vercel.svg
+  window.svg
+.gitignore
+AGENTS.md
+eslint.config.mjs
+jsconfig.json
+next.config.mjs
+package.json
+README.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="app/api/route/route.js">
+import example from "@/data/example-route.json";
+import {normalizeRoute,validCoordinate,distanceMeters} from "@/lib/geo.mjs";
+
+export async function POST(request){
+ let body;try{body=await request.json();}catch{return Response.json({error:"Permintaan rute tidak valid."},{status:400});}
+ const points=body?.points;
+ if(!Array.isArray(points)||points.length<2||points.length>9||points.some(p=>!validCoordinate(p)))return Response.json({error:"Pilih 1 sampai 8 tujuan dengan koordinat Indonesia yang valid."},{status:400});
+ if(points.some((p,i)=>i>0&&distanceMeters(points[i-1],p)<5))return Response.json({error:"Dua pemberhentian berurutan berada di titik yang sama."},{status:400});
+ try{
+  const matched=points.length===example.points.length&&points.every((p,i)=>distanceMeters(p,example.points[i])<15);
+  if(matched)return Response.json({...normalizeRoute(example.response),source:"Rute jalan tersimpan",retrieved:example.retrieved});
+  const endpoint=process.env.VALHALLA_ROUTING_URL||"https://valhalla1.openstreetmap.de/route";
+  const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json","User-Agent":"Ziarah-Walisongo-Prototype/0.1"},
+   body:JSON.stringify({locations:points.map(p=>({lon:p[0],lat:p[1]})),costing:"motor_scooter",units:"kilometers"}),cache:"no-store",signal:AbortSignal.timeout(20000)});
+  if(!response.ok)throw Error("Layanan rute sedang tidak tersedia. Coba lagi atau pilih tujuan lain.");
+  const data=await response.json();
+  return Response.json({...normalizeRoute(data),source:"Rute jalan Valhalla",retrieved:new Date().toISOString().slice(0,10)});
+ }catch(error){return Response.json({error:error.name==="TimeoutError"?"Layanan rute terlalu lama merespons. Silakan coba lagi.":error.message||"Rute belum dapat dihitung."},{status:503});}
+}
+</file>
+
+<file path="components/driving.css">
+.driving-screen{position:fixed;inset:0;z-index:80;background:#bed7c7;overflow:hidden;height:100dvh;touch-action:none;user-select:none;color:#fdfbef;font-family:Arial,Helvetica,sans-serif}.driving-canvas{width:100%;height:100%;display:block}.driving-header{position:absolute;top:max(18px,env(safe-area-inset-top));left:max(20px,env(safe-area-inset-left));right:max(20px,env(safe-area-inset-right));display:flex;align-items:center;gap:13px}.drive-icon{width:43px;height:43px;background:#315844e8;color:#fff9df;border:2px solid #fff6d97a;border-radius:14px;display:grid;place-items:center}.drive-title{padding:11px 17px;background:#315844e8;border:2px solid #fff6d955;border-radius:14px;box-shadow:0 4px 0 #27453022}.drive-title strong{font-family:Georgia,serif;font-size:22px;font-weight:400;display:block}.drive-title span{display:block;font-size:8px;letter-spacing:1.3px;margin-top:5px;color:#e2edc9}.camera-switch{display:flex;gap:4px;margin-left:auto;padding:5px;border:2px solid #fff9e375;border-radius:14px;background:#315844eb}.camera-switch button{display:flex;gap:7px;align-items:center;padding:11px 14px;background:transparent;color:#f0f4db;border:0;border-radius:10px;font-size:12px;min-height:41px;cursor:pointer}.camera-switch button[aria-pressed=true]{background:#fff0bc;color:#36523d;box-shadow:0 2px 0 #a99b7055}.drive-resources{position:absolute;top:105px;left:22px;display:flex;flex-wrap:wrap;gap:8px;max-width:65%}.drive-resources>span{display:flex;gap:7px;align-items:center;padding:9px 12px;background:#fff9eaeF;color:#4c7151;border:1px solid #fff7de;border-radius:10px;font-size:12px;box-shadow:0 3px 8px #2e523220}.drive-resources>span.low{background:#ffe3bc;color:#a05d3e}.learning-progress{position:absolute;top:155px;left:22px;display:flex;align-items:center;gap:12px;background:#fff9eaeF;color:#4c7151;border:1px solid #fff7de;border-radius:12px;padding:11px 13px;text-align:left;cursor:pointer}.learning-progress strong{display:block;font-size:12px}.learning-progress small{display:block;font-size:10px;color:#80916a;margin-top:4px}.drive-minimap{position:absolute;right:22px;top:103px;width:113px;background:#fff8e5;border:3px solid #fff8e5;border-radius:15px;box-shadow:0 4px 12px #30532a25;overflow:hidden;text-align:center}.drive-minimap svg{display:block;width:100%;height:132px}.drive-minimap>span{display:block;padding:5px;font-size:7px;letter-spacing:1px;color:#6b8257}.drive-hint{position:absolute;top:226px;left:22px;max-width:310px;line-height:1.6;padding:9px 13px;border-radius:10px;background:#35583fe0;color:#fff7df;font-size:11px}.visit-prompt{position:absolute;left:50%;bottom:180px;transform:translateX(-50%);display:flex;align-items:center;gap:13px;padding:12px 18px 12px 8px;border:2px solid #fff1bf;border-radius:18px;background:#fff9e9f5;color:#406445;box-shadow:0 5px 0 #55774c44,0 9px 25px #294e2933;max-width:calc(100% - 30px);text-align:left;cursor:pointer}.visit-prompt img{width:76px;height:67px;object-fit:contain}.visit-prompt small{display:block;font-size:7px;letter-spacing:1.2px;color:#9a9c70}.visit-prompt strong{display:block;font-size:16px;margin:6px 0}.visit-prompt em{font-style:normal;font-size:11px;color:#8e9d68}.help-prompt{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);background:#fff0cc;color:#8f5d3e;border:2px solid #e5b97b;padding:12px 18px;border-radius:12px;cursor:pointer;font-size:12px;box-shadow:0 5px 20px #3e4f3522}.drive-speed{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);text-align:center;border-radius:18px;padding:14px 24px;background:#315844df;min-width:135px;border:2px solid #fcf8da77}.drive-speed strong{font-size:36px;font-weight:400;display:block;font-variant-numeric:tabular-nums}.drive-speed small{font-size:10px;display:block;color:#e0ecc9;margin-top:2px}.drive-speed>span{display:block;font-size:10px;color:#d2e2b8;margin-top:9px}.touch-steering{position:absolute;left:max(24px,env(safe-area-inset-left));bottom:max(36px,env(safe-area-inset-bottom));display:flex;gap:13px}.touch-steering button{width:76px;height:76px;border:3px solid #fff5d4cc;border-radius:50%;color:white;font-size:36px;background:#416c48c9;touch-action:none;box-shadow:0 5px 0 #35553e55}.touch-pedals{position:absolute;right:max(24px,env(safe-area-inset-right));bottom:max(36px,env(safe-area-inset-bottom));display:flex;gap:11px;align-items:flex-end}.touch-pedals button{border:3px solid #fff3c9aa;color:#fff8e0;border-radius:17px;padding:10px;min-width:66px;font-size:12px;font-weight:bold;letter-spacing:1px;touch-action:none;box-shadow:0 5px 0 #35553e55}.touch-pedals .gas{height:110px;min-width:76px;background:#669452ed;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px}.touch-pedals .brake{height:76px;background:#d0866cec}.touch-pedals .reverse{height:48px;min-width:55px;background:#668f83ed;font-size:8px}.touch-steering button:active,.touch-pedals button:active{background:#ecd49b;color:#35583f;transform:translateY(3px);box-shadow:none}.keyboard-hint{position:absolute;bottom:13px;left:50%;transform:translateX(-50%);font-size:9px;color:#fffbe9;text-shadow:0 1px 4px #152b1b;white-space:nowrap}.drive-pause{position:absolute;inset:0;z-index:5;background:#294d35a6;backdrop-filter:blur(5px);display:grid;place-items:center;padding:20px;touch-action:pan-y;user-select:text}.drive-pause>.learning-dialog{width:min(490px,100%);max-height:90dvh;overflow:auto;overscroll-behavior:contain;padding:28px;border-radius:23px;background:#fff9e9;border:3px solid #fff0c8;color:#35573e;text-align:center;box-shadow:0 15px 60px #23452b44}.drive-pause h2{font:29px Georgia,serif;margin:15px 0}.drive-pause p{font-size:12px;color:#778164;line-height:1.8}.drive-pause .button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:11px;border:1px solid transparent;padding:11px 14px;font-size:12px;cursor:pointer}.drive-pause .primary{background:#608c53;color:#fff9df}.drive-pause .secondary{background:#f3efd9;color:#71805b;border-color:#e6dfbd}.drive-pause .full-width{width:100%;margin-top:12px}.drive-pause .button:disabled{opacity:.45;cursor:not-allowed}.drive-pause small{display:block;margin-top:17px;font-size:9px;line-height:1.7;color:#909778}.pause-party{display:flex;gap:10px;justify-content:center;margin:15px 0}.pause-party>span{display:flex;align-items:center;gap:7px;background:#f3eddb;border-radius:10px;padding:7px 10px;font-size:10px}.pause-party img{height:44px;width:30px;object-fit:contain}.incident-picture{width:115px;height:110px;object-fit:contain}.lesson-place{display:flex;align-items:center;gap:14px;text-align:left}.lesson-place img{width:96px;height:94px;object-fit:contain}.lesson-place>div>span{font-size:8px;letter-spacing:1px;color:#a19c72}.lesson-place h2{font-size:25px;margin:8px 0}.lesson-place p{font-size:10px}.drive-pause .lesson-question{margin:18px 0 14px;color:#466944;font-size:14px;font-weight:bold;text-align:left;line-height:1.6}.lesson-options{display:flex;flex-direction:column;gap:9px}.lesson-options button{display:flex;align-items:center;gap:11px;text-align:left;background:#fffcf3;border:2px solid #ebe3c8;color:#6c795c;border-radius:11px;padding:12px;font-size:12px;line-height:1.6;cursor:pointer}.lesson-options button>span{width:26px;height:26px;border-radius:50%;background:#efe9d1;display:grid;place-items:center;flex-shrink:0;font-size:10px;color:#8f936a}.lesson-options button.correct{border-color:#8aad74;background:#edf2d9;color:#486e42}.lesson-options button.incorrect{border-color:#ddab83;background:#fff0db;color:#996842}.lesson-options button:disabled{cursor:default;opacity:.8}.drive-pause .lesson-feedback{margin:14px 0;background:#f0edd8;padding:12px;border-radius:10px;text-align:left;font-size:11px;color:#70805a}.lesson-list{margin:20px 0}.lesson-list>div{display:flex;gap:10px;align-items:center;text-align:left;padding:13px 0;border-bottom:1px solid #e9e2c9}.lesson-list>div>span{width:28px;height:28px;display:grid;place-items:center;flex-shrink:0;border-radius:50%;background:#dce8c6;color:#658b4e;font-size:12px}.lesson-list strong{font-size:12px}.lesson-list small{margin:4px 0 0;font-size:9px}.lesson-list em{margin-left:auto;font-style:normal;font-size:10px;color:#7f9067;white-space:nowrap}.driving-screen button:focus-visible{outline:3px solid #d4a755;outline-offset:3px}
+@media(max-width:650px){.driving-header{left:10px;right:10px;top:max(10px,env(safe-area-inset-top));gap:6px}.drive-title{padding:9px}.drive-title strong{font-size:14px}.drive-title span{font-size:6px;letter-spacing:.6px;line-height:1.6}.drive-icon{width:35px;height:42px;flex-shrink:0}.camera-switch{gap:2px;padding:3px}.camera-switch button{padding:8px 6px;gap:4px;font-size:9px;min-height:37px}.camera-switch button svg{display:none}.drive-resources{top:81px;left:10px;gap:5px;max-width:calc(100% - 105px)}.drive-resources>span{font-size:9px;padding:7px;gap:4px;border-radius:8px}.drive-resources svg{width:12px;height:12px}.drive-minimap{right:10px;top:81px;width:82px;border-radius:11px}.drive-minimap svg{height:98px}.drive-minimap>span{font-size:6px;padding:4px}.learning-progress{left:10px;top:153px;padding:9px;gap:7px;max-width:calc(100% - 105px)}.learning-progress strong{font-size:10px}.learning-progress small{font-size:8px}.learning-progress>svg{width:14px}.drive-hint{top:220px;left:10px;right:10px;max-width:260px;font-size:9px;padding:7px 10px}.touch-steering{left:12px;bottom:max(26px,env(safe-area-inset-bottom));gap:6px}.touch-steering button{width:53px;height:53px;font-size:27px}.touch-pedals{right:12px;bottom:max(26px,env(safe-area-inset-bottom));gap:6px}.touch-pedals .gas{min-width:55px;height:83px;font-size:10px}.touch-pedals .brake{min-width:49px;height:56px;font-size:10px}.touch-pedals .reverse{position:absolute;right:0;bottom:94px;height:34px;min-width:55px;font-size:7px}.drive-speed{bottom:126px;padding:8px 12px;min-width:88px;border-radius:12px}.drive-speed strong{font-size:25px}.drive-speed small{font-size:8px}.drive-speed>span{font-size:8px}.keyboard-hint{display:none}.visit-prompt{bottom:231px;padding:8px 11px 8px 5px;gap:8px;width:calc(100% - 34px);max-width:345px;border-radius:13px}.visit-prompt img{width:49px;height:50px}.visit-prompt strong{font-size:13px;margin:4px 0}.visit-prompt small{font-size:6px}.visit-prompt em{font-size:10px}.visit-prompt>svg{margin-left:auto;flex-shrink:0}.help-prompt{top:auto;bottom:322px;transform:translateX(-50%);width:calc(100% - 45px);font-size:10px;text-align:center;padding:9px}.drive-pause{padding:12px}.drive-pause>.learning-dialog{padding:20px 16px;max-height:94dvh}.drive-pause h2{font-size:26px}.lesson-place{gap:10px}.lesson-place img{width:72px;height:75px}.lesson-place h2{font-size:23px}.lesson-place>div>span{font-size:7px}.drive-pause .lesson-question{font-size:12px}.lesson-options button{font-size:11px;padding:10px}.lesson-list strong{font-size:11px}}
+@media(max-height:500px) and (orientation:landscape){.driving-header{top:8px}.drive-title{padding:7px 11px}.drive-title strong{font-size:16px}.drive-title span{font-size:6px}.drive-icon{width:38px;height:40px}.camera-switch button{padding:8px 11px;min-height:35px}.drive-resources{top:74px;left:15px;max-width:65%;gap:5px}.drive-resources>span{padding:6px 8px;font-size:10px}.learning-progress{top:113px;left:15px;padding:7px 10px}.learning-progress strong{font-size:10px}.learning-progress small{font-size:8px}.drive-minimap{top:74px;width:77px;right:15px}.drive-minimap svg{height:87px}.drive-hint{top:169px;left:15px;max-width:230px;font-size:8px;padding:6px 8px}.touch-steering,.touch-pedals{bottom:17px}.touch-steering button{width:56px;height:56px}.touch-pedals .gas{height:78px;min-width:61px}.touch-pedals .brake{height:55px;min-width:56px}.touch-pedals .reverse{position:static;min-width:50px;height:40px}.drive-speed{bottom:22px;padding:7px 16px;min-width:100px}.drive-speed strong{font-size:24px}.drive-speed small{font-size:8px}.drive-speed>span{font-size:8px;margin-top:5px}.keyboard-hint{bottom:5px;font-size:7px}.visit-prompt{bottom:123px;width:auto;max-width:290px;padding:7px 11px 7px 4px;gap:8px;border-radius:12px}.visit-prompt img{width:45px;height:45px}.visit-prompt strong{font-size:12px;margin:4px 0}.visit-prompt small{font-size:6px}.visit-prompt em{font-size:9px}.help-prompt{top:auto;bottom:203px;font-size:9px;padding:7px 11px;transform:translateX(-50%);width:auto}.drive-pause>.learning-dialog{padding:18px;max-height:94dvh}.drive-pause h2{font-size:24px;margin:9px 0}.drive-pause .full-width{margin-top:8px}.drive-pause .button{min-height:37px;padding:8px}.drive-pause small{margin-top:10px}.incident-picture{height:70px;width:75px}.pause-party{margin:9px 0}.pause-party img{height:31px}}
+</file>
+
+<file path="components/DrivingScene.js">
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { CHARACTERS, ASSET } from "@/lib/catalog.mjs";
+
+import {
+  advanceRide,
+  createSceneRenderer,
+  newRide,
+  nearestPlace,
+  serviceRide,
+  helpRide,
+  PRACTICE_PLACES,
+} from "@/lib/driving-scene.mjs";
+
+import Icon from "./Icon";
+import "./driving.css";
+
+const CAMERA_KEY = "ziarah-walisongo.camera.v1";
+
+const EMPTY = {
+  left: false,
+  right: false,
+  gas: false,
+  brake: false,
+  reverse: false,
+};
+
+const rupiah = (value) =>
+  new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
+
+function time(value) {
+  const hours = String(Math.floor(value / 60) % 24).padStart(2, "0");
+  const minutes = String(Math.floor(value) % 60).padStart(2, "0");
+
+  return `${hours}:${minutes}`;
+}
+
+const LESSONS = {
+  spbu: {
+    title: "Mengisi bensin dengan tertib",
+    question:
+      "Sebelum pengisian bensin dimulai, apa yang perlu dilakukan?",
+    options: [
+      "Mematikan mesin dan mengikuti petunjuk petugas.",
+      "Membiarkan mesin tetap menyala.",
+      "Menambah gas agar mesin tetap panas.",
+    ],
+    answer: 0,
+    explanation:
+      "Berhenti, matikan mesin, dan ikuti petunjuk petugas selama pengisian.",
+    action: "Isi tangki sampai 5 liter",
+  },
+
+  bengkel: {
+    title: "Kenali kendala kendaraan",
+    question:
+      "Ban terasa kempis saat berkendara. Apa tindakan yang tepat?",
+    options: [
+      "Menambah kecepatan supaya cepat sampai.",
+      "Berhenti di tempat aman dan meminta bantuan.",
+      "Mengabaikannya selama mesin masih menyala.",
+    ],
+    answer: 1,
+    explanation:
+      "Ban yang bermasalah perlu diperiksa. Berhenti di tempat aman dan minta bantuan; jangan memaksakan perjalanan.",
+    action: "Periksa dan perbaiki ban",
+  },
+
+  hotel: {
+    title: "Istirahat bagian dari perjalanan",
+    question:
+      "Ketika mulai mengantuk dalam perjalanan, apa yang sebaiknya dilakukan?",
+    options: [
+      "Memaksakan diri agar cepat sampai.",
+      "Mempercepat kendaraan.",
+      "Berhenti di tempat singgah dan beristirahat.",
+    ],
+    answer: 2,
+    explanation:
+      "Istirahat membantu memulihkan energi. Dalam game, tidur 6 jam memulihkan energi kedua karakter.",
+    action: "Istirahat 6 jam",
+  },
+
+  masjid: {
+    title: "Singgah dengan tertib",
+    question:
+      "Sebelum menggunakan fasilitas singgah di masjid, apa yang perlu diperhatikan?",
+    options: [
+      "Izin pengelola, kebersihan, dan kenyamanan jamaah.",
+      "Menggunakan semua ruang tanpa bertanya.",
+      "Meninggalkan barang di jalur masuk.",
+    ],
+    answer: 0,
+    explanation:
+      "Ikuti ketentuan pengelola dan jaga kebersihan. Masjid latihan ini menyediakan fasilitas singgah dalam game.",
+    action: "Istirahat di fasilitas singgah",
+  },
+
+  maqbarah: {
+    title: "Menjaga adab saat berziarah",
+    question:
+      "Perilaku apa yang tepat saat berada di kawasan maqbarah?",
+    options: [
+      "Membuang sampah di sekitar makam.",
+      "Menjaga ketenangan, kebersihan, dan mengikuti aturan setempat.",
+      "Mengganggu pengunjung lain.",
+    ],
+    answer: 1,
+    explanation:
+      "Bersikap sopan, jaga kebersihan, dan hormati aturan serta pengunjung lain.",
+    action: "Catat kunjungan latihan",
+  },
+};
+
+function snapshot(state) {
+  return {
+    ...state,
+    lessons: [...state.lessons],
+    logs: [...state.logs],
+    triggered: { ...state.triggered },
+  };
+}
+
+export default function DrivingScene({ party, onExit }) {
+  const canvas = useRef(null);
+  const ride = useRef(newRide());
+  const input = useRef({ ...EMPTY });
+  const cameraRef = useRef("behind");
+  const pausedRef = useRef(false);
+
+  const [camera, setCamera] = useState("behind");
+  const [panel, setPanel] = useState(null);
+  const [stats, setStats] = useState(() => snapshot(ride.current));
+
+  const [error, setError] = useState("");
+  const [placeId, setPlaceId] = useState(null);
+  const [answer, setAnswer] = useState(null);
+  const [feedback, setFeedback] = useState("");
+  const [done, setDone] = useState(false);
+
+  const nearby = nearestPlace(stats);
+  const canVisit = nearby.distance <= nearby.radius;
+
+  const place = PRACTICE_PLACES.find((item) => item.id === placeId);
+  const lesson = place ? LESSONS[place.type] : null;
+
+  function sync() {
+    setStats(snapshot(ride.current));
+  }
+
+  function openPanel(name) {
+    pausedRef.current = true;
+    ride.current.speed = 0;
+    input.current = { ...EMPTY };
+
+    setPanel(name);
+    sync();
+  }
+
+  function resume() {
+    input.current = { ...EMPTY };
+    pausedRef.current = false;
+    setPanel(null);
+  }
+
+  function changeCamera(value) {
+    cameraRef.current = value;
+    setCamera(value);
+
+    try {
+      localStorage.setItem(CAMERA_KEY, value);
+    } catch {
+      // Kamera tetap dapat digunakan tanpa penyimpanan browser.
+    }
+  }
+
+  function openPlace(id) {
+    const target = PRACTICE_PLACES.find((item) => item.id === id);
+
+    if (!target) return;
+
+    const distance = Math.hypot(
+      ride.current.x - target.x,
+      ride.current.z - target.z
+    );
+
+    if (distance > target.radius) return;
+
+    setPlaceId(id);
+    setAnswer(null);
+    setFeedback("");
+    setDone(false);
+
+    openPanel("place");
+  }
+
+  function chooseAnswer(index) {
+    if (!lesson) return;
+
+    setAnswer(index);
+
+    if (index === lesson.answer) {
+      setFeedback(lesson.explanation);
+    } else {
+      setFeedback(
+        "Belum tepat. Pertimbangkan keselamatan dan kenyamanan orang lain, lalu coba lagi."
+      );
+    }
+  }
+
+  function completeLesson() {
+    if (!lesson || !place) return;
+    if (answer !== lesson.answer || done) return;
+
+    const result = serviceRide(ride.current, place.id);
+
+    setFeedback(result.message);
+
+    if (result.ok) {
+      setDone(true);
+    }
+
+    sync();
+  }
+
+  function assistance() {
+    helpRide(ride.current);
+    sync();
+
+    setFeedback(
+      "Bantuan latihan tiba. Energi, ban, dan bahan bakar dipulihkan. Bekal tersedia minimal Rp75.000 agar pembelajaran dapat diteruskan."
+    );
+
+    setPanel("pause");
+  }
+
+  function tow() {
+    const state = ride.current;
+
+    state.x = 155 * Math.cos(-0.15);
+    state.z = 225 * Math.sin(-0.15);
+    state.heading = 0.15;
+    state.speed = 0;
+    state.clock += 30;
+
+    state.logs.unshift(
+      "Bantuan mengantar Vespa ke area bengkel."
+    );
+
+    openPlace("bengkel");
+  }
+
+  useEffect(() => {
+    try {
+      const savedCamera = localStorage.getItem(CAMERA_KEY);
+
+      if (["behind", "top"].includes(savedCamera)) {
+        cameraRef.current = savedCamera;
+        setCamera(savedCamera);
+      }
+    } catch {
+      // Penyimpanan tidak wajib untuk menjalankan arena.
+    }
+
+    const element = canvas.current;
+    let render;
+
+    try {
+      render = createSceneRenderer(element);
+    } catch (caughtError) {
+      setError(caughtError.message);
+      return;
+    }
+
+    const oldOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function resize() {
+      const rect = element.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+
+      element.width = Math.max(
+        1,
+        Math.round(rect.width * dpr)
+      );
+
+      element.height = Math.max(
+        1,
+        Math.round(rect.height * dpr)
+      );
+    }
+
+    const observer = new ResizeObserver(resize);
+    observer.observe(element);
+    resize();
+
+    const keyMap = {
+      ArrowLeft: "left",
+      a: "left",
+      A: "left",
+
+      ArrowRight: "right",
+      d: "right",
+      D: "right",
+
+      ArrowUp: "gas",
+      w: "gas",
+      W: "gas",
+
+      ArrowDown: "brake",
+      s: "brake",
+      S: "brake",
+
+      r: "reverse",
+      R: "reverse",
+
+      " ": "brake",
+    };
+
+    function handleKey(event) {
+      const targetIsControl =
+        event.target instanceof HTMLElement &&
+        event.target.closest(
+          "button,input,textarea,select"
+        );
+
+      if (
+        targetIsControl &&
+        [" ", "Enter"].includes(event.key)
+      ) {
+        return;
+      }
+
+      const action = keyMap[event.key];
+
+      if (action) {
+        event.preventDefault();
+
+        if (!pausedRef.current) {
+          input.current[action] =
+            event.type === "keydown";
+        }
+      }
+
+      if (
+        event.type === "keydown" &&
+        !event.repeat &&
+        event.key === "Escape"
+      ) {
+        event.preventDefault();
+
+        if (!pausedRef.current) {
+          pausedRef.current = true;
+          ride.current.speed = 0;
+          input.current = { ...EMPTY };
+          setPanel("pause");
+        }
+      }
+    }
+
+    function handleBlur() {
+      input.current = { ...EMPTY };
+
+      if (!pausedRef.current) {
+        pausedRef.current = true;
+        ride.current.speed = 0;
+        setPanel("pause");
+      }
+    }
+
+    function handleVisibility() {
+      if (document.hidden) {
+        handleBlur();
+      }
+    }
+
+    window.addEventListener("keydown", handleKey);
+    window.addEventListener("keyup", handleKey);
+    window.addEventListener("blur", handleBlur);
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibility
+    );
+
+    let frame;
+    let last = performance.now();
+    let lastUi = 0;
+    let lastDraw = 0;
+    let active = true;
+    let observedTyre = false;
+
+    function loop(now) {
+      if (!active) return;
+
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+
+      if (!pausedRef.current) {
+        advanceRide(
+          ride.current,
+          input.current,
+          dt
+        );
+      }
+
+      if (
+        ride.current.event === "tyre" &&
+        !observedTyre
+      ) {
+        observedTyre = true;
+        pausedRef.current = true;
+        input.current = { ...EMPTY };
+        ride.current.speed = 0;
+
+        setPanel("incident");
+      }
+
+      if (now - lastDraw > 1000 / 30) {
+        try {
+          render(
+            ride.current,
+            cameraRef.current,
+            party
+          );
+        } catch {
+          setError(
+            "Tampilan arena tidak dapat dirender. Kembali ke menu lalu coba lagi."
+          );
+
+          active = false;
+          return;
+        }
+
+        lastDraw = now;
+      }
+
+      if (now - lastUi > 200) {
+        setStats(snapshot(ride.current));
+        lastUi = now;
+      }
+
+      frame = requestAnimationFrame(loop);
+    }
+
+    frame = requestAnimationFrame(loop);
+
+    return () => {
+      active = false;
+
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+
+      document.body.style.overflow = oldOverflow;
+
+      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("keyup", handleKey);
+      window.removeEventListener("blur", handleBlur);
+
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibility
+      );
+    };
+  }, [party]);
+
+  function control(action) {
+    return {
+      onPointerDown(event) {
+        event.preventDefault();
+
+        event.currentTarget.setPointerCapture(
+          event.pointerId
+        );
+
+        if (!pausedRef.current) {
+          input.current[action] = true;
+        }
+      },
+
+      onPointerUp() {
+        input.current[action] = false;
+      },
+
+      onPointerCancel() {
+        input.current[action] = false;
+      },
+
+      onLostPointerCapture() {
+        input.current[action] = false;
+      },
+
+      onContextMenu(event) {
+        event.preventDefault();
+      },
+    };
+  }
+
+  let serviceCost = 0;
+
+  if (place?.type === "spbu") {
+    serviceCost = Math.ceil(
+      (5 - stats.fuel) * 12000
+    );
+  } else if (place?.type === "bengkel") {
+    serviceCost = 20000;
+  } else if (place?.type === "hotel") {
+    serviceCost = 40000;
+  }
+
+  const needsHelp =
+    stats.fuel <= 0 ||
+    stats.energy <= 0 ||
+    stats.event === "tyre";
+
+  let hint =
+    "Jelajahi kawasan dan kumpulkan lima pelajaran.";
+
+  if (stats.event === "tyre") {
+    hint = "Ban bocor. Minta bantuan ke bengkel.";
+  } else if (stats.fuel <= 0) {
+    hint =
+      "Bensin habis. Gunakan bantuan gratis pada menu Jeda.";
+  } else if (stats.energy <= 0) {
+    hint =
+      "Energi habis. Gunakan bantuan singgah pada menu Jeda.";
+  } else if (stats.fuel < 0.5) {
+    hint =
+      "Bensin menipis. Cari POM Pelangi di denah.";
+  } else if (stats.offroad) {
+    hint =
+      "Di luar jalan · kecepatan dibatasi";
+  }
+
+  return (
+    <section
+      className="driving-screen"
+      role="region"
+      aria-label="Kawasan belajar berkendara"
+    >
+      <canvas
+        ref={canvas}
+        className="driving-canvas"
+        aria-label="Arena kartun tiga dimensi sederhana"
+      />
+
+      <header className="driving-header">
+        <button
+          className="drive-icon"
+          onClick={() => openPanel("pause")}
+          aria-label="Jeda permainan"
+        >
+          <Icon name="pause" />
+        </button>
+
+        <div className="drive-title">
+          <strong>Kampung Persinggahan</strong>
+          <span>ARENA BELAJAR FIKTIF</span>
+        </div>
+
+        <div
+          className="camera-switch"
+          role="group"
+          aria-label="Pilih model kamera"
+        >
+          <button
+            aria-pressed={camera === "behind"}
+            onClick={() => changeCamera("behind")}
+          >
+            <Icon name="users" size={16} />
+            <span>Belakang</span>
+          </button>
+
+          <button
+            aria-pressed={camera === "top"}
+            onClick={() => changeCamera("top")}
+          >
+            <Icon name="map" size={16} />
+            <span>Atas</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="drive-resources">
+        <span
+          className={stats.fuel < 0.5 ? "low" : ""}
+        >
+          <Icon name="fuel" size={15} />
+          {stats.fuel.toFixed(1)} L
+        </span>
+
+        <span
+          className={stats.energy < 20 ? "low" : ""}
+        >
+          <Icon name="heart" size={15} />
+          {Math.round(stats.energy)}%
+        </span>
+
+        <span>
+          <Icon name="clock" size={15} />
+          {time(stats.clock)}
+        </span>
+
+        <span>{rupiah(stats.money)}</span>
+      </div>
+
+      <button
+        className="learning-progress"
+        onClick={() => openPanel("lessons")}
+      >
+        <Icon name="book" size={17} />
+
+        <span>
+          <strong>
+            {stats.lessons.length}/5 pelajaran
+          </strong>
+
+          <small>
+            {stats.lessons.length === 5
+              ? "Semua tempat sudah dipelajari!"
+              : "Singgah, belajar, lalu lanjutkan."}
+          </small>
+        </span>
+
+        <Icon name="chevron" size={17} />
+      </button>
+
+      <div className="drive-minimap">
+        <svg
+          viewBox="-260 -320 520 640"
+          role="img"
+          aria-label="Denah arena latihan"
+        >
+          <rect
+            x="-260"
+            y="-320"
+            width="520"
+            height="640"
+            rx="40"
+            fill="#e9efc9"
+          />
+
+          <ellipse
+            rx="155"
+            ry="225"
+            fill="none"
+            stroke="#a4ad8e"
+            strokeWidth="24"
+          />
+
+          {PRACTICE_PLACES.map((item, index) => (
+            <g key={item.id}>
+              <circle
+                cx={item.x}
+                cy={item.z}
+                r="22"
+                fill={
+                  stats.lessons.includes(item.id)
+                    ? "#5a9c71"
+                    : "#e8ab6c"
+                }
+              />
+
+              <text
+                x={item.x}
+                y={item.z + 9}
+                textAnchor="middle"
+                fontSize="27"
+                fill="white"
+                fontFamily="Arial"
+              >
+                {index + 1}
+              </text>
+            </g>
+          ))}
+
+          <g
+            transform={
+              `translate(${stats.x} ${stats.z}) ` +
+              `rotate(${
+                (-stats.heading * 180) / Math.PI
+              })`
+            }
+          >
+            <polygon
+              points="0,19 -12,-12 12,-12"
+              fill="#31564a"
+              stroke="#fffce8"
+              strokeWidth="4"
+            />
+          </g>
+        </svg>
+
+        <span>DENAH LATIHAN</span>
+      </div>
+
+      <div className="drive-hint" role="status">
+        {hint}
+      </div>
+
+      {canVisit && !panel && (
+        <button
+          className="visit-prompt"
+          onClick={() => openPlace(nearby.id)}
+        >
+          <img
+            src={`${ASSET}/buildings/${nearby.image}`}
+            alt=""
+          />
+
+          <span>
+            <small>ANDA BERADA DI AREA</small>
+            <strong>{nearby.name}</strong>
+            <em>Singgah & belajar</em>
+          </span>
+
+          <Icon name="arrow" size={22} />
+        </button>
+      )}
+
+      {needsHelp && !panel && (
+        <button
+          className="help-prompt"
+          onClick={() =>
+            stats.event === "tyre"
+              ? openPanel("incident")
+              : openPanel("pause")
+          }
+        >
+          Butuh bantuan? Ketuk di sini
+        </button>
+      )}
+
+      <div className="drive-speed">
+        <strong>
+          {Math.round(Math.abs(stats.speed) * 3.6)}
+          <small>km/jam</small>
+        </strong>
+
+        <span>
+          {Math.round(stats.distance)} m ditempuh
+        </span>
+      </div>
+
+      <div className="touch-steering">
+        <button
+          {...control("left")}
+          aria-label="Belok kiri"
+        >
+          ←
+        </button>
+
+        <button
+          {...control("right")}
+          aria-label="Belok kanan"
+        >
+          →
+        </button>
+      </div>
+
+      <div className="touch-pedals">
+        <button
+          className="reverse"
+          {...control("reverse")}
+        >
+          MUNDUR
+        </button>
+
+        <button
+          className="brake"
+          {...control("brake")}
+        >
+          REM
+        </button>
+
+        <button
+          className="gas"
+          {...control("gas")}
+        >
+          GAS
+          <Icon name="up" size={25} />
+        </button>
+      </div>
+
+      <span className="keyboard-hint">
+        WASD / panah · R mundur · Esc jeda · semua
+        tarif dan konsumsi merupakan simulasi
+      </span>
+
+      {(panel || error) && (
+        <div className="drive-pause">
+          <div
+            className="learning-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={
+              place && panel === "place"
+                ? place.name
+                : "Menu permainan"
+            }
+          >
+            {error ? (
+              <>
+                <Icon name="info" size={35} />
+                <h2>Arena belum tersedia</h2>
+                <p>{error}</p>
+
+                <button
+                  className="button primary full-width"
+                  onClick={onExit}
+                >
+                  Kembali ke menu
+                </button>
+              </>
+            ) : panel === "place" && place ? (
+              <>
+                <div className="lesson-place">
+                  <img
+                    src={`${ASSET}/buildings/${place.image}`}
+                    alt={place.name}
+                  />
+
+                  <div>
+                    <span>
+                      PERSINGGAHAN BELAJAR
+                    </span>
+                    <h2>{place.name}</h2>
+                    <p>{lesson.title}</p>
+                  </div>
+                </div>
+
+                <p className="lesson-question">
+                  {lesson.question}
+                </p>
+
+                <div className="lesson-options">
+                  {lesson.options.map(
+                    (option, index) => (
+                      <button
+                        key={option}
+                        disabled={done}
+                        className={
+                          answer === index
+                            ? index === lesson.answer
+                              ? "correct"
+                              : "incorrect"
+                            : ""
+                        }
+                        onClick={() =>
+                          chooseAnswer(index)
+                        }
+                      >
+                        <span>
+                          {String.fromCharCode(
+                            65 + index
+                          )}
+                        </span>
+
+                        {option}
+                      </button>
+                    )
+                  )}
+                </div>
+
+                {feedback && (
+                  <p
+                    className="lesson-feedback"
+                    role="status"
+                  >
+                    {feedback}
+                  </p>
+                )}
+
+                {!done && (
+                  <button
+                    className="button primary full-width"
+                    disabled={
+                      answer !== lesson.answer
+                    }
+                    onClick={completeLesson}
+                  >
+                    {lesson.action}
+                    {" · "}
+                    {serviceCost
+                      ? rupiah(serviceCost)
+                      : "Gratis"}
+                  </button>
+                )}
+
+                <button
+                  className="button secondary full-width"
+                  onClick={resume}
+                >
+                  {done
+                    ? "Selesai, lanjutkan perjalanan"
+                    : "Kembali ke arena"}
+                </button>
+
+                <small>
+                  Fasilitas, tarif, waktu, dan
+                  konsumsi merupakan simulasi
+                  belajar.
+                </small>
+              </>
+            ) : panel === "incident" ? (
+              <>
+                <img
+                  className="incident-picture"
+                  src={`${ASSET}/items/ban_cadangan.png`}
+                  alt="Ban cadangan"
+                />
+
+                <h2>Ban Vespa bocor.</h2>
+
+                <p>
+                  Vespa sudah berhenti. Jangan
+                  memaksakan perjalanan. Bengkel
+                  Sahabat berada di dekat sini;
+                  minta bantuan agar kendaraan
+                  dibawa ke sana.
+                </p>
+
+                <button
+                  className="button primary full-width"
+                  onClick={tow}
+                >
+                  Minta bantuan ke bengkel
+                </button>
+
+                <button
+                  className="button secondary full-width"
+                  onClick={resume}
+                >
+                  Lihat posisi di arena
+                </button>
+
+                <small>
+                  Pengantaran ini gratis dalam
+                  latihan. Di bengkel, pelajari
+                  tindakan yang tepat sebelum
+                  melakukan perbaikan.
+                </small>
+              </>
+            ) : panel === "lessons" ? (
+              <>
+                <Icon name="book" size={32} />
+                <h2>Paspor belajar</h2>
+
+                <p>
+                  Singgahi lima tempat. Jawab
+                  pertanyaannya, lalu gunakan
+                  fasilitas untuk mencatat
+                  pelajaran.
+                </p>
+
+                <div className="lesson-list">
+                  {PRACTICE_PLACES.map(
+                    (item, index) => (
+                      <div key={item.id}>
+                        <span>
+                          {stats.lessons.includes(
+                            item.id
+                          )
+                            ? "✓"
+                            : index + 1}
+                        </span>
+
+                        <div>
+                          <strong>
+                            {item.name}
+                          </strong>
+
+                          <small>
+                            {
+                              LESSONS[item.type]
+                                .title
+                            }
+                          </small>
+                        </div>
+
+                        <em>
+                          {stats.lessons.includes(
+                            item.id
+                          )
+                            ? "Selesai"
+                            : `${Math.round(
+                                Math.hypot(
+                                  stats.x - item.x,
+                                  stats.z - item.z
+                                )
+                              )} m`}
+                        </em>
+                      </div>
+                    )
+                  )}
+                </div>
+
+                <button
+                  className="button primary full-width"
+                  onClick={resume}
+                >
+                  Kembali menjelajah
+                </button>
+              </>
+            ) : (
+              <>
+                <Icon name="compass" size={35} />
+                <h2>Singgah sejenak.</h2>
+
+                <p>
+                  {feedback ||
+                    "Belajar merawat kendaraan, mengatur bekal, dan menjaga adab di setiap persinggahan."}
+                </p>
+
+                <div className="pause-party">
+                  {party.map((id) => {
+                    const character =
+                      CHARACTERS.find(
+                        (item) => item.id === id
+                      );
+
+                    if (!character) return null;
+
+                    return (
+                      <span key={id}>
+                        <img
+                          src={`${ASSET}/characters/${character.image}`}
+                          alt=""
+                        />
+                        {character.name}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <button
+                  className="button primary full-width"
+                  onClick={resume}
+                >
+                  Lanjutkan bermain
+                </button>
+
+                <button
+                  className="button secondary full-width"
+                  onClick={() =>
+                    setPanel("lessons")
+                  }
+                >
+                  Lihat paspor belajar
+                </button>
+
+                <button
+                  className="button secondary full-width"
+                  onClick={assistance}
+                >
+                  Bantuan latihan gratis
+                </button>
+
+                <button
+                  className="button secondary full-width"
+                  onClick={onExit}
+                >
+                  Kembali ke menu utama
+                </button>
+
+                <small>
+                  Arena fiktif untuk belajar, bukan
+                  peta jalan nyata. Progres arena
+                  kembali ke awal setelah keluar.
+                  Pilihan karakter dan kamera
+                  tetap tersimpan.
+                </small>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+</file>
+
+<file path="components/Game.js">
+"use client";
+
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
+
+import { ASSET, CHARACTERS } from "@/lib/catalog.mjs";
+import { SEED_LOCATIONS } from "@/lib/locations.mjs";
+import {
+  isValidParty,
+  parseParty,
+  PARTY_STORAGE_KEY,
+} from "@/lib/party.mjs";
+
+import Icon from "./Icon";
+import Modal from "./Modal";
+
+const WorldMap = dynamic(() => import("./WorldMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="map-loading">
+      <span className="spinner" />
+      Menyiapkan peta Indonesia…
+    </div>
+  ),
+});
+
+const DrivingScene = dynamic(() => import("./DrivingScene"), {
+  ssr: false,
+  loading: () => (
+    <div
+      role="status"
+      style={{
+        minHeight: "100dvh",
+        display: "grid",
+        placeItems: "center",
+        background: "#edf1e7",
+        color: "#42664e",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <span className="spinner" />
+        Menyiapkan arena latihan…
+      </div>
+    </div>
+  ),
+});
+
+const START = SEED_LOCATIONS.find(
+  (place) => place.id === "sunan-ampel"
+);
+
+const NO_VISITS = [];
+
+function PartyPicker({ initial, onSave }) {
+  const [ids, setIds] = useState(initial);
+
+  function toggle(id) {
+    setIds((list) => {
+      if (list.includes(id)) {
+        return list.filter((item) => item !== id);
+      }
+
+      if (list.length < 2) {
+        return [...list, id];
+      }
+
+      return list;
+    });
+  }
+
+  return (
+    <>
+      <div className="party-guide">
+        <span>01 · Pengendara</span>
+        <Icon name="plus" size={14} />
+        <span>02 · Penumpang</span>
+        <strong>{ids.length}/2 dipilih</strong>
+      </div>
+
+      <div className="character-grid">
+        {CHARACTERS.map((character) => {
+          const order = ids.indexOf(character.id);
+          const selected = order >= 0;
+
+          return (
+            <button
+              key={character.id}
+              type="button"
+              className={
+                "character-option" + (selected ? " selected" : "")
+              }
+              aria-pressed={selected}
+              disabled={!selected && ids.length === 2}
+              onClick={() => toggle(character.id)}
+            >
+              <div
+                className="character-art"
+                style={{
+                  backgroundColor: character.color,
+                }}
+              >
+                <img
+                  src={`${ASSET}/characters/${character.image}`}
+                  alt={character.name}
+                />
+
+                <span className="character-order">
+                  {selected ? (
+                    order + 1
+                  ) : (
+                    <Icon name="plus" size={15} />
+                  )}
+                </span>
+              </div>
+
+              <strong>{character.name}</strong>
+
+              <span>
+                {selected
+                  ? order === 0
+                    ? "Pengendara"
+                    : "Penumpang"
+                  : character.detail}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="muted small">
+        Pilih tepat dua karakter berbeda. Untuk mengganti pilihan,
+        klik kembali karakter yang sudah dipilih.
+      </p>
+
+      <div className="modal-actions wrap-actions">
+        <button
+          type="button"
+          className="button secondary"
+          disabled={ids.length !== 2}
+          onClick={() => setIds(([first, second]) => [second, first])}
+        >
+          <Icon name="route" size={17} />
+          Tukar posisi
+        </button>
+
+        <button
+          type="button"
+          className="button primary"
+          disabled={!isValidParty(ids)}
+          onClick={() => onSave(ids)}
+        >
+          <Icon name="check" size={18} />
+          Simpan 2 karakter
+        </button>
+      </div>
+    </>
+  );
+}
+
+export default function Game() {
+  const [party, setParty] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+
+  const [saveStatus, setSaveStatus] = useState(
+    "Memuat pilihan…"
+  );
+
+  const [modal, setModal] = useState(null);
+  const [selectedId, setSelectedId] = useState("sunan-giri");
+  const [toast, setToast] = useState("");
+  const [focusRequest, setFocusRequest] = useState(null);
+
+  const mapApi = useRef(null);
+
+  const selected =
+    SEED_LOCATIONS.find((place) => place.id === selectedId) ||
+    START;
+
+  const ready = isValidParty(party);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PARTY_STORAGE_KEY);
+      const saved = raw ? parseParty(raw) : null;
+
+      if (saved) {
+        setParty(saved);
+        setSaveStatus("Pilihan tersimpan");
+      } else {
+        setSaveStatus(
+          raw
+            ? "Pilih ulang dua karakter"
+            : "Belum memilih karakter"
+        );
+      }
+    } catch {
+      setSaveStatus("Penyimpanan tidak tersedia");
+    }
+
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+
+    const timer = setTimeout(() => {
+      setToast("");
+    }, 6000);
+
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  function saveParty(ids) {
+    if (!isValidParty(ids)) return;
+
+    setParty([...ids]);
+    setModal(null);
+
+    try {
+      localStorage.setItem(
+        PARTY_STORAGE_KEY,
+        JSON.stringify({
+          version: 1,
+          ids,
+        })
+      );
+
+      setSaveStatus("Pilihan tersimpan");
+    } catch {
+      setSaveStatus("Pilihan belum tersimpan");
+
+      setToast(
+        "Karakter sudah dipilih, tetapi penyimpanan browser " +
+          "diblokir. Pilihan hanya berlaku selama halaman ini terbuka."
+      );
+
+      return;
+    }
+
+    setToast(
+      "Dua karakter siap menemani perjalanan. " +
+        "Klik Mainkan arena latihan untuk mencoba dua kamera."
+    );
+  }
+
+  function startPractice() {
+    if (!loaded) return;
+
+    setToast("");
+    setModal(ready ? "drive" : "party");
+  }
+
+  // Diletakkan setelah seluruh hook agar urutan hook tetap konsisten.
+  // State pilihan karakter tetap dipertahankan saat kembali ke menu.
+  if (modal === "drive" && ready) {
+    return (
+      <DrivingScene
+        party={party}
+        onExit={() => setModal(null)}
+      />
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      <aside
+        className="side-rail"
+        aria-label="Navigasi utama"
+      >
+        <a
+          href="#main"
+          className="brand-mark"
+          aria-label="Ziarah Walisongo"
+        >
+          <Icon name="compass" size={28} />
+        </a>
+
+        <div className="rail-links">
+          <button
+            type="button"
+            className={!modal ? "active" : ""}
+            onClick={() => setModal(null)}
+            aria-label="Layar utama"
+          >
+            <Icon name="map" size={22} />
+            <span>Peta</span>
+          </button>
+
+          <button
+            type="button"
+            className={modal === "party" ? "active" : ""}
+            onClick={() => setModal("party")}
+            disabled={!loaded}
+            aria-label="Pilih karakter"
+          >
+            <Icon name="users" size={22} />
+            <span>Karakter</span>
+          </button>
+
+          <button
+            type="button"
+            disabled
+            title="Jurnal tersedia pada tahap berikutnya"
+            aria-label="Jurnal, tahap berikutnya"
+          >
+            <Icon name="book" size={22} />
+            <span>Jurnal</span>
+          </button>
+
+          <button
+            type="button"
+            disabled
+            title="Bekal tersedia pada tahap berikutnya"
+            aria-label="Bekal, tahap berikutnya"
+          >
+            <Icon name="bag" size={22} />
+            <span>Bekal</span>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          className="rail-help"
+          onClick={() => setModal("help")}
+          title="Tentang tahap ini"
+          aria-label="Tentang tahap ini"
+        >
+          <Icon name="info" size={22} />
+        </button>
+
+        <span className="rail-version">V 0.2</span>
+      </aside>
+
+      <div className="app-content">
+        <header className="topbar">
+          <div className="wordmark">
+            ziarah
+            <span>WALISONGO</span>
+          </div>
+
+          <div className="topbar-divider" />
+
+          <span className="topbar-caption">
+            Sebuah perjalanan, banyak cerita.
+          </span>
+
+          <div className="topbar-actions">
+            <span className="prototype-badge">
+              DUA KAMERA
+            </span>
+
+            <span className="save-indicator" role="status">
+              <span
+                className={
+                  ready
+                    ? "status-dot"
+                    : "status-dot neutral"
+                }
+              />
+              <span>{saveStatus}</span>
+              <Icon name="save" size={17} />
+            </span>
+          </div>
+        </header>
+
+        <main id="main" className="main-content">
+          <section className="page-heading">
+            <div>
+              <div className="eyebrow">
+                <span />
+                SIMULATOR PERJALANAN VESPA
+              </div>
+
+              <h1>Ziarah Walisongo.</h1>
+
+              <p>
+                Berangkat berdua, mengenal jejak para wali.
+                Pilih teman perjalananmu untuk memulai.
+              </p>
+            </div>
+
+            <div className="heading-stats">
+              <div className="time-stat">
+                <span className="stat-icon">
+                  <Icon name="sun" size={22} />
+                </span>
+
+                <span>
+                  <small>Waktu awal perjalanan</small>
+                  <strong>
+                    09:00 <em>Hari ke-1</em>
+                  </strong>
+                </span>
+              </div>
+
+              <div className="wallet-stat">
+                <span className="stat-icon">
+                  <Icon name="wallet" size={21} />
+                </span>
+
+                <span>
+                  <small>Bekal awal</small>
+                  <strong>Rp450.000</strong>
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <div className="journey-layout">
+            <section
+              className="map-card"
+              aria-label="Tampilan awal peta Indonesia"
+            >
+              <div className="map-toolbar">
+                <div className="map-title">
+                  <Icon name="map" size={18} />
+                  <h2>Peta perjalanan</h2>
+                  <span className="map-country">
+                    INDONESIA
+                  </span>
+                </div>
+
+                <div className="map-tools">
+                  <button
+                    type="button"
+                    title="Lihat seluruh Indonesia"
+                    onClick={() =>
+                      mapApi.current?.indonesia()
+                    }
+                  >
+                    <Icon name="compass" size={17} />
+                    <span>Indonesia</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    title="Kembali ke titik awal"
+                    aria-label="Kembali ke titik awal"
+                    onClick={() =>
+                      setFocusRequest({
+                        coordinates: START.coordinates,
+                        zoom: 12,
+                        nonce: Date.now(),
+                      })
+                    }
+                  >
+                    <Icon name="target" size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="map-stage">
+                <WorldMap
+                  locations={SEED_LOCATIONS}
+                  position={START.coordinates}
+                  route={null}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onPick={() => {}}
+                  placing={false}
+                  apiRef={mapApi}
+                  moving={false}
+                  visits={NO_VISITS}
+                  focusRequest={focusRequest}
+                />
+
+                <div className="map-caption">
+                  <span className="status-dot" />
+                  Titik awal · Sunan Ampel, Surabaya
+                </div>
+
+                <div className="map-legend">
+                  <span>
+                    <i className="legend-dot wali" />
+                    Maqbarah Walisongo
+                  </span>
+
+                  <span>
+                    <img
+                      src={`${ASSET}/items/vespa.png`}
+                      alt=""
+                    />
+                    Posisi awal
+                  </span>
+                </div>
+
+                <div className="map-journey-card">
+                  <span className="destination-icon">
+                    <Icon name="landmark" size={24} />
+                  </span>
+
+                  <div>
+                    <span className="eyebrow">
+                      KENALI TUJUAN ZIARAH
+                    </span>
+                    <strong>{selected.name}</strong>
+                    <small>{selected.region}</small>
+                  </div>
+
+                  <span className="map-location-number">
+                    {String(
+                      SEED_LOCATIONS.indexOf(selected) + 1
+                    ).padStart(2, "0")}
+                    <small>/09</small>
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            <aside
+              className="planner-card"
+              aria-label="Persiapan perjalanan"
+            >
+              <div className="planner-heading">
+                <span className="section-kicker">
+                  MULAI BERMAIN
+                </span>
+                <h2>Berdua, lebih bermakna.</h2>
+                <p>Satu Vespa, dua teman perjalanan.</p>
+              </div>
+
+              <div className="welcome-illustration">
+                <span className="illustration-halo" />
+
+                <img
+                  src={`${ASSET}/items/vespa.png`}
+                  alt="Vespa hijau mint untuk perjalanan berdua"
+                />
+
+                <span className="illustration-label">
+                  SIAP MENJELAJAH
+                </span>
+              </div>
+
+              <div className="onboarding-steps">
+                <div
+                  className={
+                    "setup-step current" +
+                    (ready ? " done" : "")
+                  }
+                >
+                  <span>
+                    {ready ? (
+                      <Icon name="check" size={16} />
+                    ) : (
+                      "01"
+                    )}
+                  </span>
+
+                  <div>
+                    <strong>Pilih teman perjalanan</strong>
+                    <small>
+                      {ready
+                        ? "Pengendara & penumpang sudah siap"
+                        : "Dua karakter, masing-masing punya cerita"}
+                    </small>
+                  </div>
+                </div>
+
+                <div className="setup-step">
+                  <span>02</span>
+                  <div>
+                    <strong>Coba arena latihan</strong>
+                    <small>
+                      Gas, rem, belok, dan mundur
+                    </small>
+                  </div>
+                </div>
+
+                <div className="setup-step">
+                  <span>03</span>
+                  <div>
+                    <strong>Pilih sudut kamera</strong>
+                    <small>
+                      Belakang atau atas, ganti saat bermain
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <div className="departure-panel">
+                <button
+                  type="button"
+                  className="button primary departure-button"
+                  disabled={!loaded}
+                  onClick={startPractice}
+                >
+                  <Icon
+                    name={ready ? "play" : "users"}
+                    size={18}
+                  />
+
+                  {ready
+                    ? "Mainkan arena latihan"
+                    : "Pilih 2 karakter"}
+
+                  <Icon name="arrow" size={18} />
+                </button>
+
+                {ready && (
+                  <button
+                    type="button"
+                    className="button secondary full-width"
+                    onClick={() => setModal("party")}
+                  >
+                    <Icon name="users" size={16} />
+                    Lihat & ubah pasangan
+                  </button>
+                )}
+
+                <span className="departure-note">
+                  <Icon
+                    name={ready ? "check" : "heart"}
+                    size={12}
+                  />
+
+                  {ready
+                    ? "Kontrol sentuh HP dan keyboard"
+                    : "Awali perjalanan bersama temanmu."}
+                </span>
+              </div>
+            </aside>
+          </div>
+
+          <section
+            className="dashboard-cards"
+            aria-label="Ringkasan persiapan"
+          >
+            <article className="summary-card party-summary">
+              <div className="card-title">
+                <h2>
+                  <Icon name="users" size={18} />
+                  Teman perjalanan
+                </h2>
+
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={!loaded}
+                  onClick={() => setModal("party")}
+                >
+                  {ready ? "Ganti" : "Pilih"}
+                  <Icon name="chevron" size={14} />
+                </button>
+              </div>
+
+              <div className="party-pair">
+                {[0, 1].map((index) => {
+                  const character = CHARACTERS.find(
+                    (item) => item.id === party[index]
+                  );
+
+                  return (
+                    <div
+                      key={index}
+                      className="party-person"
+                    >
+                      <button
+                        type="button"
+                        className={
+                          "avatar" +
+                          (!character ? " empty-avatar" : "")
+                        }
+                        style={
+                          character
+                            ? {
+                                background: character.color,
+                              }
+                            : undefined
+                        }
+                        disabled={!loaded}
+                        onClick={() => setModal("party")}
+                        aria-label={
+                          character
+                            ? `Ganti ${character.name}`
+                            : `Pilih ${
+                                index === 0
+                                  ? "pengendara"
+                                  : "penumpang"
+                              }`
+                        }
+                      >
+                        {character ? (
+                          <img
+                            src={`${ASSET}/characters/${character.image}`}
+                            alt={character.name}
+                          />
+                        ) : (
+                          <Icon name="plus" size={23} />
+                        )}
+                      </button>
+
+                      <div>
+                        <small>
+                          {index === 0
+                            ? "PENGENDARA"
+                            : "PENUMPANG"}
+                        </small>
+
+                        <strong>
+                          {character?.name || "Belum dipilih"}
+                        </strong>
+
+                        <span className="person-state">
+                          {character ? (
+                            <>
+                              <span className="status-dot" />
+                              Siap menemani
+                            </>
+                          ) : (
+                            "Pilih karakter dahulu"
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+
+            <article className="summary-card vespa-summary">
+              <div className="card-title">
+                <h2>
+                  <Icon name="fuel" size={18} />
+                  Vespa & bekal awal
+                </h2>
+
+                <span className="mini-badge">
+                  PERSIAPAN
+                </span>
+              </div>
+
+              <div className="vespa-overview">
+                <img
+                  className="vespa-art"
+                  src={`${ASSET}/items/vespa.png`}
+                  alt=""
+                />
+
+                <div>
+                  <div className="meter">
+                    <div>
+                      <span>Bahan bakar awal</span>
+                      <strong>4,0 / 5,5 L</strong>
+                    </div>
+
+                    <progress
+                      max="5.5"
+                      value="4"
+                      aria-label="Bahan bakar awal"
+                    />
+                  </div>
+
+                  <span className="vehicle-condition">
+                    <i className="status-dot" />
+                    Vespa siap menemani
+                  </span>
+                </div>
+              </div>
+            </article>
+
+            <article className="summary-card journal-summary">
+              <div className="card-title">
+                <h2>
+                  <Icon name="landmark" size={18} />
+                  Sembilan tujuan
+                </h2>
+
+                <span className="mini-badge">
+                  WALISONGO
+                </span>
+              </div>
+
+              <div className="visit-count">
+                <strong>09</strong>
+
+                <p>
+                  Maqbarah Walisongo
+                  <br />
+                  menanti untuk dikenali
+                </p>
+              </div>
+
+              <div className="visit-dots">
+                {SEED_LOCATIONS.map((place, index) => (
+                  <button
+                    key={place.id}
+                    type="button"
+                    className={
+                      selectedId === place.id
+                        ? "selected"
+                        : ""
+                    }
+                    aria-pressed={selectedId === place.id}
+                    aria-label={`Lihat ${place.name}`}
+                    title={place.name}
+                    onClick={() => {
+                      setSelectedId(place.id);
+
+                      setFocusRequest({
+                        coordinates: place.coordinates,
+                        zoom: 11,
+                        nonce: Date.now(),
+                      });
+                    }}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+              </div>
+            </article>
+          </section>
+
+          <footer className="page-footer">
+            <span>
+              <Icon name="compass" size={14} />
+              Arena latihan · Kamera belakang & atas
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setModal("help")}
+            >
+              Tentang prototipe
+              <Icon name="external" size={12} />
+            </button>
+          </footer>
+        </main>
+      </div>
+
+      {toast && (
+        <div className="toast" role="status">
+          <Icon name="check" size={18} />
+          <span>{toast}</span>
+
+          <button
+            type="button"
+            onClick={() => setToast("")}
+            aria-label="Tutup pemberitahuan"
+          >
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      )}
+
+      {modal === "party" && (
+        <Modal
+          wide
+          title="Dengan siapa kita berangkat?"
+          intro="Pilih dua karakter berbeda sebagai pengendara dan penumpang."
+          onClose={() => setModal(null)}
+        >
+          <PartyPicker
+            initial={party}
+            onSave={saveParty}
+          />
+        </Modal>
+      )}
+
+      {modal === "help" && (
+        <Modal
+          title="Saatnya mencoba Vespa"
+          intro="Simulator Ziarah Walisongo · Dua kamera"
+          onClose={() => setModal(null)}
+        >
+          <ol className="help-steps">
+            <li>
+              <strong>Pilih tepat dua karakter.</strong>
+              <p>
+                Karakter pertama menjadi pengendara.
+                Karakter kedua menjadi penumpang.
+                Gunakan Tukar posisi untuk menukar keduanya.
+              </p>
+            </li>
+
+            <li>
+              <strong>Masuk ke arena latihan.</strong>
+              <p>
+                Simpan pilihan, lalu tekan Mainkan arena
+                latihan. Di HP, tahan tombol GAS sambil
+                menekan panah kiri atau kanan. REM
+                memperlambat Vespa dan MUNDUR membuatnya
+                berjalan mundur.
+              </p>
+            </li>
+
+            <li>
+              <strong>Ganti kamera saat bermain.</strong>
+              <p>
+                Gunakan tombol Belakang dan Atas di kanan
+                atas. Posisi dan kecepatan Vespa tetap sama
+                ketika kamera berganti.
+              </p>
+            </li>
+
+            <li>
+              <strong>Jeda dan kembali ke menu.</strong>
+              <p>
+                Tekan tombol jeda di kiri atas. Pada
+                komputer, gunakan WASD atau tombol panah,
+                R untuk mundur, dan Esc untuk jeda.
+              </p>
+            </li>
+          </ol>
+
+          <p className="notice">
+            Arena latihan memakai jalan fiktif dan model
+            geometris sederhana. Rute nyata pada peta
+            Indonesia, penambahan maqbarah, jurnal, bahan
+            bakar, serta kejadian perjalanan belum
+            dihubungkan ke arena ini.
+          </p>
+
+          <p className="muted small">
+            Pilihan karakter dan kamera disimpan pada
+            browser. Posisi dan jarak latihan kembali ke
+            awal setelah keluar arena. Peta menu
+            membutuhkan internet dan WebGL; arena latihan
+            menggunakan Canvas.
+          </p>
+
+          <button
+            type="button"
+            className="button primary full-width"
+            disabled={!loaded}
+            onClick={startPractice}
+          >
+            {ready
+              ? "Mainkan arena latihan"
+              : "Pilih teman perjalanan"}
+
+            <Icon name="arrow" size={18} />
+          </button>
+        </Modal>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="components/Icon.js">
+const paths={
+ compass:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm4 5-2.5 5.5L8 16l2.5-5.5Z",
+ map:"m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Zm6-3v15m6-12v15",
+ pin:"M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0ZM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z",
+ plus:"M12 5v14M5 12h14",check:"m5 12 4 4L19 6",close:"m6 6 12 12M6 18 18 6",
+ chevron:"m9 5 7 7-7 7",down:"m6 9 6 6 6-6",up:"m6 15 6-6 6 6",arrow:"M4 12h16m-6-6 6 6-6 6",
+ route:"M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm12 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM9 6h6a4 4 0 0 1 0 8H9a3 3 0 0 0 0 6h6",
+ users:"M9 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 4v3",
+ fuel:"M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16M2 21h15M5 7h9M15 11h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3",
+ sun:"M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5",
+ moon:"M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z",
+ book:"M12 6C8 3 4 3 2 4v15c3-1 6-1 10 2 4-3 7-3 10-2V4c-3-1-6-1-10 2ZM12 6v15",
+ bag:"M4 9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2ZM9 7V5a3 3 0 0 1 6 0v2M4 13h16",
+ wallet:"M20 8V5a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v12H5a3 3 0 0 1-3-3V6M20 12h-5v5h5",
+ save:"M20 21H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h13l4 4v13a1 1 0 0 1-1 1ZM7 3v6h10V3M7 21v-7h10v7",
+ play:"m8 4 13 8-13 8Z",pause:"M8 4v16M16 4v16",
+ clock:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 7v6l4 2",
+ landmark:"m3 8 9-5 9 5M3 21h18M5 9v9m7-9v9m7-9v9M2 8h20",
+ wrench:"M21 4a6 6 0 0 1-7.8 7.8L5 20a2.1 2.1 0 0 1-3-3l8.2-8.2A6 6 0 0 1 18 1l-4 4 5 3Z",
+ bed:"M3 4v17M21 21V11a2 2 0 0 0-2-2H3M3 17h18M7 9V6h6v3",
+ coffee:"M4 8h13v8a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5ZM17 9h1a3 3 0 1 1 0 6h-1M7 2v3m5-3v3",
+ store:"m3 3-1 6a3 3 0 0 0 5 2 3 3 0 0 0 5 0 3 3 0 0 0 5 0 3 3 0 0 0 5-2l-1-6ZM4 12v9h16v-9M9 21v-6h6v6",
+ edit:"m16 3 5 5L8 21H3v-5ZM13 6l5 5",download:"M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5",
+ upload:"M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5",trash:"M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7",
+ search:"M10.5 3a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15ZM16 16l5 5",
+ heart:"M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z",
+ info:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 11v6M12 7h.01",
+ target:"M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14ZM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM12 1v4m0 14v4M1 12h4m14 0h4",
+ external:"M15 3h6v6m0-6L11 13M10 3H3v18h18v-7"
+};
+export default function Icon({name,size=20,...props}){return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}><path d={paths[name]||paths.compass}/></svg>;}
+</file>
+
+<file path="components/LocationForm.js">
+"use client";
+import {useState} from "react";
+import {PLACE_TYPES} from "@/lib/catalog.mjs";
+import {validateLocation} from "@/lib/game-engine.mjs";
+import Icon from "./Icon";
+export default function LocationForm({initial,onSave,onCancel}){
+ const [type,setType]=useState(initial?.type||"maqbarah"),[error,setError]=useState("");
+ function submit(e){e.preventDefault();const f=new FormData(e.currentTarget);
+  try{const p=validateLocation({id:initial?.id||"lokasi-"+crypto.randomUUID(),type,name:f.get("name"),person:f.get("person"),region:f.get("region"),history:f.get("history"),source:f.get("source"),coordinates:[Number(f.get("longitude")),Number(f.get("latitude"))],canRest:f.get("canRest")==="on",custom:initial?.custom??true});onSave(p);}
+  catch(err){setError(err.message);}
+ }
+ return <form onSubmit={submit} className="location-form">
+  <label>Jenis lokasi<select value={type} onChange={e=>setType(e.target.value)}>{Object.entries(PLACE_TYPES).map(([id,t])=><option key={id} value={id}>{t.label}</option>)}</select></label>
+  <label>Nama lokasi<input name="name" required maxLength={100} defaultValue={initial?.name||""} placeholder="Contoh: Maqbarah keluarga"/></label>
+  {type==="maqbarah"&&<label>Nama tokoh yang diziarahi<input name="person" maxLength={120} defaultValue={initial?.person||""} placeholder="Nama sunan, kiai, atau tokoh"/></label>}
+  <label>Alamat / wilayah<input name="region" maxLength={140} defaultValue={initial?.region||""} placeholder="Desa, kota, atau kabupaten"/></label>
+  <div className="form-row"><label>Latitude<input name="latitude" type="number" step="any" required min="-11.5" max="6.5" defaultValue={initial?.coordinates?.[1]}/></label><label>Longitude<input name="longitude" type="number" step="any" required min="94" max="142" defaultValue={initial?.coordinates?.[0]}/></label></div>
+  <label>{type==="maqbarah"?"Sejarah / catatan tokoh":"Catatan lokasi"}<textarea name="history" rows={5} maxLength={6000} defaultValue={initial?.history||""} placeholder="Tuliskan sejarah atau informasi yang ingin Anda simpan…"/></label>
+  <label>Sumber atau rujukan (opsional)<input name="source" type="url" maxLength={1000} defaultValue={initial?.source||""} placeholder="https://…"/></label>
+  {type==="masjid"&&<label className="checkbox-label"><input name="canRest" type="checkbox" defaultChecked={!!initial?.canRest}/>Tersedia fasilitas singgah / istirahat dalam game</label>}
+  {type==="hotel"&&<p className="muted small">Hotel menawarkan istirahat. Tarif simulasi: Rp50.000.</p>}
+  {error&&<p className="form-error" role="alert">{error}</p>}
+  <div className="modal-actions"><button className="button secondary" type="button" onClick={onCancel}>Batal</button><button className="button primary" type="submit"><Icon name="save" size={17}/>Simpan lokasi</button></div>
+ </form>;
+}
+</file>
+
+<file path="components/Modal.js">
+"use client";
+import {useEffect,useId,useRef} from "react";
+import Icon from "./Icon";
+export default function Modal({title,intro,children,onClose,wide=false}){
+ const ref=useRef(null),id=useId();
+ useEffect(()=>{const d=ref.current;if(!d.open)d.showModal();return()=>{if(d.open)d.close();};},[]);
+ return <dialog ref={ref} className={"modal"+(wide?" modal-wide":"")} aria-labelledby={id} onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===ref.current)onClose();}}>
+  <div className="modal-top"><div><h2 id={id}>{title}</h2>{intro&&<p>{intro}</p>}</div><button className="icon-button" aria-label="Tutup jendela" onClick={onClose}><Icon name="close"/></button></div>
+  {children}
+ </dialog>;
+}
+</file>
+
+<file path="data/example-route.json">
+{"points":[[112.7422732,-7.2299754],[112.6310331,-7.1688945]],"retrieved":"2026-10-24","provider":"Valhalla / OpenStreetMap","response":{"trip":{"locations":[{"type":"break","lat":-7.229975,"lon":112.742273,"side_of_street":"right","original_index":0},{"type":"break","lat":-7.168894,"lon":112.631033,"original_index":1}],"legs":[{"maneuvers":[{"type":2,"instruction":"Drive north.","verbal_succinct_transition_instruction":"Drive north. Then Turn left.","verbal_pre_transition_instruction":"Drive north. Then Turn left.","verbal_post_transition_instruction":"Continue for 40 meters.","bearing_after":13,"time":9.62,"length":0.037,"cost":17.798,"begin_shape_index":0,"end_shape_index":6,"verbal_multi_cue":true,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":15,"instruction":"Turn left.","verbal_transition_alert_instruction":"Turn left.","verbal_succinct_transition_instruction":"Turn left.","verbal_pre_transition_instruction":"Turn left.","verbal_post_transition_instruction":"Continue for 80 meters.","bearing_before":25,"bearing_after":286,"time":23.636,"length":0.078,"cost":50.127,"begin_shape_index":6,"end_shape_index":14,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":15,"instruction":"Turn left onto Jalan Petukangan.","verbal_transition_alert_instruction":"Turn left onto Jalan Petukangan.","verbal_succinct_transition_instruction":"Turn left.","verbal_pre_transition_instruction":"Turn left onto Jalan Petukangan.","verbal_post_transition_instruction":"Continue for 80 meters.","street_names":["Jalan Petukangan"],"bearing_before":269,"bearing_after":178,"time":23.4,"length":0.082,"cost":41.865,"begin_shape_index":14,"end_shape_index":16,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":10,"instruction":"Turn right to stay on Jalan Petukangan.","verbal_transition_alert_instruction":"Turn right to stay on Jalan Petukangan.","verbal_succinct_transition_instruction":"Turn right.","verbal_pre_transition_instruction":"Turn right to stay on Jalan Petukangan.","verbal_post_transition_instruction":"Continue for 70 meters.","street_names":["Jalan Petukangan"],"bearing_before":184,"bearing_after":279,"time":23.416,"length":0.068,"cost":45.042,"begin_shape_index":16,"end_shape_index":18,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":10,"instruction":"Turn right onto Jalan KH Mas Mansyur.","verbal_transition_alert_instruction":"Turn right onto Jalan KH Mas Mansyur.","verbal_succinct_transition_instruction":"Turn right.","verbal_pre_transition_instruction":"Turn right onto Jalan KH Mas Mansyur.","verbal_post_transition_instruction":"Continue for 500 meters.","street_names":["Jalan KH Mas Mansyur"],"bearing_before":273,"bearing_after":358,"time":95.302,"length":0.526,"cost":187.462,"begin_shape_index":18,"end_shape_index":35,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":26,"instruction":"Enter the roundabout and take the 2nd exit onto Jalan Raya Hang Tuah.","verbal_transition_alert_instruction":"Enter the roundabout and take the 2nd exit onto Jalan Raya Hang Tuah.","verbal_succinct_transition_instruction":"Enter the roundabout and take the 2nd exit.","verbal_pre_transition_instruction":"Enter the roundabout and take the 2nd exit onto Jalan Raya Hang Tuah.","bearing_before":2,"bearing_after":295,"time":12.768,"length":0.042,"cost":32.654,"begin_shape_index":35,"end_shape_index":42,"roundabout_exit_count":2,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":27,"instruction":"Exit the roundabout onto Jalan Raya Hang Tuah.","verbal_succinct_transition_instruction":"Exit the roundabout.","verbal_pre_transition_instruction":"Exit the roundabout onto Jalan Raya Hang Tuah.","verbal_post_transition_instruction":"Continue for 300 meters.","street_names":["Jalan Raya Hang Tuah"],"bearing_before":16,"bearing_after":352,"time":42.441,"length":0.306,"cost":87.766,"begin_shape_index":42,"end_shape_index":46,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":15,"instruction":"Turn left onto Jalan Jakarta.","verbal_transition_alert_instruction":"Turn left onto Jalan Jakarta.","verbal_succinct_transition_instruction":"Turn left.","verbal_pre_transition_instruction":"Turn left onto Jalan Jakarta.","verbal_post_transition_instruction":"Continue for 500 meters.","street_names":["Jalan Jakarta"],"bearing_before":353,"bearing_after":269,"time":68.513,"length":0.473,"cost":139.482,"begin_shape_index":46,"end_shape_index":68,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":26,"instruction":"Enter the roundabout and take the 1st exit onto Jalan Jakarta.","verbal_transition_alert_instruction":"Enter the roundabout and take the 1st exit onto Jalan Jakarta.","verbal_succinct_transition_instruction":"Enter the roundabout and take the 1st exit.","verbal_pre_transition_instruction":"Enter the roundabout and take the 1st exit onto Jalan Jakarta.","bearing_before":267,"bearing_after":216,"time":6.343,"length":0.027,"cost":18.419,"begin_shape_index":68,"end_shape_index":75,"roundabout_exit_count":1,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":27,"instruction":"Exit the roundabout onto Jalan Jakarta.","verbal_succinct_transition_instruction":"Exit the roundabout.","verbal_pre_transition_instruction":"Exit the roundabout onto Jalan Jakarta.","verbal_post_transition_instruction":"Continue for 400 meters.","street_names":["Jalan Jakarta"],"bearing_before":298,"bearing_after":273,"time":60.44,"length":0.435,"cost":125.066,"begin_shape_index":75,"end_shape_index":98,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":16,"instruction":"Bear left onto Jalan Perak Timur.","verbal_transition_alert_instruction":"Bear left onto Jalan Perak Timur.","verbal_succinct_transition_instruction":"Bear left.","verbal_pre_transition_instruction":"Bear left onto Jalan Perak Timur.","verbal_post_transition_instruction":"Continue for 1 kilometer.","street_names":["Jalan Perak Timur"],"bearing_before":229,"bearing_after":188,"time":155.233,"length":1.12,"cost":312.57,"begin_shape_index":98,"end_shape_index":111,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":9,"instruction":"Bear right onto Jalan Gresik.","verbal_transition_alert_instruction":"Bear right onto Jalan Gresik.","verbal_succinct_transition_instruction":"Bear right.","verbal_pre_transition_instruction":"Bear right onto Jalan Gresik.","verbal_post_transition_instruction":"Continue for 6 kilometers.","street_names":["Jalan Gresik"],"bearing_before":192,"bearing_after":213,"time":662.177,"length":5.737,"cost":1270.615,"begin_shape_index":111,"end_shape_index":272,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":12,"instruction":"Make a right U-turn at 1 onto 1/Jalan Margomulyo.","verbal_transition_alert_instruction":"Make a right U-turn at 1.","verbal_succinct_transition_instruction":"Make a right U-turn.","verbal_pre_transition_instruction":"Make a right U-turn at 1 onto 1, Jalan Margomulyo.","verbal_post_transition_instruction":"Continue for 600 meters.","street_names":["1","Jalan Margomulyo"],"bearing_before":181,"bearing_after":1,"time":64.232,"length":0.649,"cost":114.691,"begin_shape_index":272,"end_shape_index":287,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":16,"instruction":"Bear left onto 1/Jalan Tambak Oso. Continue on 1.","verbal_transition_alert_instruction":"Bear left onto 1.","verbal_succinct_transition_instruction":"Bear left.","verbal_pre_transition_instruction":"Bear left onto 1, Jalan Tambak Oso.","verbal_post_transition_instruction":"Continue on 1 for 7 kilometers.","street_names":["1"],"begin_street_names":["1","Jalan Tambak Oso"],"bearing_before":2,"bearing_after":338,"time":612.348,"length":6.704,"cost":1043.286,"begin_shape_index":287,"end_shape_index":469,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":15,"instruction":"Turn left onto Jalan Mayor Jenderal Sungkono.","verbal_transition_alert_instruction":"Turn left onto Jalan Mayor Jenderal Sungkono.","verbal_succinct_transition_instruction":"Turn left.","verbal_pre_transition_instruction":"Turn left onto Jalan Mayor Jenderal Sungkono.","verbal_post_transition_instruction":"Continue for 2 kilometers.","street_names":["Jalan Mayor Jenderal Sungkono"],"bearing_before":16,"bearing_after":282,"time":270.57,"length":2.082,"cost":383.052,"begin_shape_index":469,"end_shape_index":513,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":24,"instruction":"Keep left to stay on Jalan Mayor Jenderal Sungkono.","verbal_transition_alert_instruction":"Keep left to stay on Jalan Mayor Jenderal Sungkono.","verbal_pre_transition_instruction":"Keep left to stay on Jalan Mayor Jenderal Sungkono.","verbal_post_transition_instruction":"Continue for 3 kilometers.","street_names":["Jalan Mayor Jenderal Sungkono"],"bearing_before":254,"bearing_after":238,"time":435.896,"length":3.175,"cost":649.136,"begin_shape_index":513,"end_shape_index":593,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":15,"instruction":"Turn left.","verbal_transition_alert_instruction":"Turn left.","verbal_succinct_transition_instruction":"Turn left.","verbal_pre_transition_instruction":"Turn left.","verbal_post_transition_instruction":"Continue for 400 meters.","bearing_before":70,"bearing_after":358,"time":165.476,"length":0.362,"cost":585.197,"begin_shape_index":593,"end_shape_index":605,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":10,"instruction":"Turn right.","verbal_transition_alert_instruction":"Turn right.","verbal_succinct_transition_instruction":"Turn right.","verbal_pre_transition_instruction":"Turn right.","verbal_post_transition_instruction":"Continue for 200 meters.","bearing_before":21,"bearing_after":114,"time":69.144,"length":0.229,"cost":157.489,"begin_shape_index":605,"end_shape_index":613,"travel_mode":"drive","travel_type":"motor_scooter"},{"type":4,"instruction":"You have arrived at your destination.","verbal_transition_alert_instruction":"You will arrive at your destination.","verbal_pre_transition_instruction":"You have arrived at your destination.","bearing_before":114,"time":0.0,"length":0.0,"cost":0.0,"begin_shape_index":613,"end_shape_index":613,"travel_mode":"drive","travel_type":"motor_scooter"}],"summary":{"has_time_restrictions":false,"has_toll":false,"has_highway":false,"has_ferry":false,"min_lat":-7.235545,"min_lon":112.620471,"max_lat":-7.167971,"max_lon":112.742167,"time":2800.962,"length":22.134,"cost":5261.726},"shape":"l}gxL{if`vE_IkAoA[}@g@o@g@_AUw@Eq@rD]hBe@hCW`AqEhKW|@G|AFbId_@]|LZiAlNg@|UmBByjBdAoPJkFDyTa@{S{@_BKqQaAkCK}Nm@iDU_ISgMKwLEgBEoIG{PWG`Bi@xAeAbAkBl@uBAiBs@kAwAwYvBkOzAuKl@kqBfLJdVVjs@PhKPdKZnRTvAJt@Px@Rl@bB|ExBbF\\lDJjD@tGK~DcDzMSpAQz@In@At@x@pn@j@jZz@^n@n@^z@NbACbAW~@g@v@k@t\\_AlDT|XjAzdAJ`JBrAJzLBpA?~ADrFBnGDfG@zCBvD~@fC`@xAXrAf@xBz@tCxA`DtAzBrChD~D|E`ZtB|`@fC`_@`Gtq@|Olo@tT`NrEb_Cvw@ldBzp@rjAjf@lCzAjd@pStL`FvIn@`DdAbCrAhDhEtG`PnFrQf@`Cv@nD|@nDxB~IjAtE|@tDxM~`@v@~BhEnRXvDFtEKlBw@zHa@rDqHbk@uApKoEr_@{AvKqDnWCbGCrEeFvb@cFdg@qDt`@s@dI_@lD{@nE}BvRgCxNeA`Gc@jBQp@Of@oBvDuEr[eA~JS|AOt@EZSjAoDtVQ`A]bDgDhYuC|UgDrXaC`SkDfYmAnJ[tC}ApMmDnY_@`DcG`g@]vCaA|HaCvSgBzNuFpf@eBhOmCvUyEta@_Et]iDv[g@bCmDnWq@tE}AfNwDb\\yCzWyBnRqC~VGjAgEp^QpC_BdMsCtYo@pGcCpTqCdZ_@tCWxDIhC]bOFvUAxBDvx@Mb^Fx]AzEX~MDnI?h\\Bzo@e@`rAF`KClMBrU[nMEzP?|N?|HQnQHfYFzUWhJHvKC|PGvt@ItDBjGO|`@IfUGrCHtGN|g@FdEPhx@NbRJh[@lCPzRY`WG`GDdIGvi@NpIFfIK`k@i@h`AAbGCjUIhc@AnMHdd@JlOX|XB`H^dZTxUVj^DxWAdDNz\\z@tbAGvRjCbGdAtAlB|AdBjA`E`BnFEzl@EpgBnB~zCbDzZHhGdDj@|BFdBSrAShAeDdEeKGcIIik@a@gt@{@og@e@a[[kHGadCaCaBAmDdAoAb@qGdDoB~BwAtCcA~ECtEGbF@p_@BpWp@vk@OhVVnZLxY@bBRbVC`C\\dk@G`CFtUr@ta@HdIVzIPbTAlJVr[Tnz@?xl@@|IIdJ{@jNwAfLqBlKaG~PsBvG{B~FeBhEqBhDmPz_@mLrViJlTeDtHyFvMwSlh@sMlXgJzRmPz^uGbMaYjm@u@|A}BjFoMhY_GpMaJ`So@xAiB~DaDdHkFtFwNnZuT|d@aIlQeQpc@iLvV{DjIuCpG_BxDkPzb@wAzCaAzBuChHwAlG_BvD{IfSwn@txAcNxZsJzUsIlR{JhUeHnPiSbd@if@|fAuQn`@iHxMaGlI_GrH_HtG}H`GsItE_DdBeEjBgAf@eNxEmMjD_\\|I}O|DcOpD}Bh@w@PyIxBkz@`TuBf@wBf@mAXgXzFySrDwHRyDz@wV~FuXnHyMbD_Dp@oWfGkCl@uHfBmAZwg@zLwEhAkEdAkFhAkGhBkb@jJkGbB}i@~MuKtCqWjH}l@pNwAZcIxBaQjE{Cv@cMfD_MdDmW~FaN`GgQpEoz@bTsgAjX_g@rMsNrDwPvEeUxFiS|EsS~E{XvG{[|HqTfFwMdDyShFiEdA}aBpa@cr@|PgMt@oF~@mPlEwHtC{BvAwJ|HyDlD}AxA{MxLqKfKwFjFmUfTkAjAoQrPcWxUwVfVsF|EqPfO_b@n\\}DpB_E`AkE`A}HJyJq@gE}@ms@gOykAeVqFoA{TgEgH}AeOwCaB`MiA~HkBzPsBhT}@jJmJ`xAiBdL_BfI_Qd{@{Kpg@oFbX{A|I}ErVgDvQwFlT_FzTsBlJ_CbPsFli@gB|QkDhl@QbDGtBsC|}@OfHw@pOS|_@e@zSIzc@CpQr@pX`Ebh@tE~a@vJbc@jUb]j`@zl@^l@fB~DtBzJ|Hxb@d@lCjMhm@tGv]lHr_@xJxQfMnShQhSpDhGxCvGf@|DCfGaApFiIrOaoAtrAeBf@}_@n_@gb@bd@sFbGkF~FeTxTuKjLahAzjAi`@na@sAfAuBjAsBx@mBVso@~A{BN_[`Aij@lAgBJuIVoTp@mg@Fgl@p@aCLaR`Aob@vBuQJgIq@cH}AcLgFag@yUqE}B}RiKsIoE}u@c_@cd@cTi_@aP}Bu@kI_Cw]cMm]kMcJ_FkLkJmN{MqUwS}EeEmDeDqLcKuWeW_FmEq^sYwFmEgIaHm]qT{PsKkDsBwNaKuMcJsGqEeFmEsIyI{NmJu]uReM{GiOaIgDwCgDcDoCoCgD{EaFgIgFmSkc@`@{VmBep@mJqR}A_SkCiFkAqJ_Dg@Uk@WwHaBcL{CiCw@jGiRpJcUvLmPnIgJ~JuCdFaElFkG|CiJ"}],"summary":{"has_time_restrictions":false,"has_toll":false,"has_highway":false,"has_ferry":false,"min_lat":-7.235545,"min_lon":112.620471,"max_lat":-7.167971,"max_lon":112.742167,"time":2800.962,"length":22.134,"cost":5261.726},"status_message":"Found route between points","status":0,"units":"kilometers","language":"en-US"}}}
+</file>
+
+<file path="lib/catalog.mjs">
+export const CHARACTERS = [
+ {id:"bapak",name:"Bapak",detail:"Bersarung batik",image:"bapak_batik_peci_nu.png",color:"#e8eee4"},
+ {id:"ibu",name:"Ibu",detail:"Hijab krem",image:"ibu_paruh_baya.png",color:"#f1e9dd"},
+ {id:"anak",name:"Anak laki-laki",detail:"Peci NU",image:"anak_laki_laki_nu.png",color:"#edf0df"},
+ {id:"remaja-hijau",name:"Remaja hijau",detail:"Hijab hijau",image:"remaja_perempuan_hijau.png",color:"#e6eee5"},
+ {id:"remaja-terakota",name:"Remaja terakota",detail:"Hijab terakota",image:"remaja_perempuan_terakota.png",color:"#f2e4db"},
+];
+export const PLACE_TYPES = {
+ maqbarah:{label:"Maqbarah",icon:"landmark",image:"maqbarah.png",color:"#46674c"},
+ masjid:{label:"Masjid",icon:"moon",image:"masjid.png",color:"#68805a"},
+ hotel:{label:"Hotel",icon:"bed",image:"hotel.png",color:"#8d7197"},
+ spbu:{label:"POM bensin",icon:"fuel",image:"pom_bensin.png",color:"#bd765c"},
+ bengkel:{label:"Bengkel",icon:"wrench",image:"bengkel.png",color:"#6b8390"},
+ warung:{label:"Warung",icon:"coffee",image:"warung.png",color:"#b68d4a"},
+ pasar:{label:"Pasar",icon:"store",image:"pasar.png",color:"#c29853"},
+ minimarket:{label:"Minimarket",icon:"store",image:"indomaret.png",color:"#7f89aa"}
+};
+export const ASSET="/assets";
+export const STORAGE_KEY="ziarah-walisongo.game.v1";
+export const INITIAL_POSITION=[112.7422732,-7.2299754];
+export const money=v=>new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(v);
+export const distanceLabel=m=>m<1000?`${Math.round(m)} m`:`${(m/1000).toLocaleString("id-ID",{maximumFractionDigits:1})} km`;
+export function gameTime(m){const t=Math.floor(m)%1440;return `${String(Math.floor(t/60)).padStart(2,"0")}:${String(t%60).padStart(2,"0")}`;}
+export const isNight=m=>m%1440<360||m%1440>=1080;
+</file>
+
+<file path="lib/driving-scene.mjs">
+// Arena kartun fiktif untuk latihan.
+// Bukan geometri jalan Indonesia.
+
+const TAU = Math.PI * 2;
+
+const RX = 155;
+const RZ = 225;
+
+function norm(vector) {
+  const length = Math.hypot(...vector) || 1;
+
+  return vector.map((value) => value / length);
+}
+
+function sub(a, b) {
+  return a.map((value, index) => value - b[index]);
+}
+
+function dot(a, b) {
+  return a.reduce(
+    (total, value, index) => total + value * b[index],
+    0
+  );
+}
+
+function cross(a, b) {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+
+function track(angle) {
+  return [
+    RX * Math.cos(angle),
+    RZ * Math.sin(angle),
+  ];
+}
+
+function shade(hex, factor) {
+  const channels = hex.slice(1).match(/../g);
+
+  return (
+    "#" +
+    channels
+      .map((value) => {
+        const adjusted = Math.max(
+          0,
+          Math.min(
+            255,
+            Math.round(parseInt(value, 16) * factor)
+          )
+        );
+
+        return adjusted.toString(16).padStart(2, "0");
+      })
+      .join("")
+  );
+}
+
+export const PRACTICE_PLACES = [
+  {
+    id: "pom",
+    name: "POM Pelangi",
+    type: "spbu",
+    x: 65,
+    z: -175,
+    w: 19,
+    d: 14,
+    h: 6,
+    color: "#ffe2a8",
+    roof: "#ea8870",
+    image: "pom_bensin.png",
+    icon: "fuel",
+    radius: 42,
+    roadT: -1.05,
+  },
+
+  {
+    id: "bengkel",
+    name: "Bengkel Sahabat",
+    type: "bengkel",
+    x: 131,
+    z: -34,
+    w: 19,
+    d: 16,
+    h: 7,
+    color: "#bce0e7",
+    roof: "#5f9fba",
+    image: "bengkel.png",
+    icon: "wrench",
+    radius: 43,
+    roadT: -0.15,
+  },
+
+  {
+    id: "hotel",
+    name: "Penginapan Teduh",
+    type: "hotel",
+    x: 88,
+    z: 143,
+    w: 20,
+    d: 17,
+    h: 14,
+    color: "#f6d4b0",
+    roof: "#bc8dba",
+    image: "hotel.png",
+    icon: "bed",
+    radius: 43,
+    roadT: 0.8,
+  },
+
+  {
+    id: "masjid",
+    name: "Masjid Taman",
+    type: "masjid",
+    x: -84,
+    z: 147,
+    w: 24,
+    d: 23,
+    h: 10,
+    color: "#fff1cc",
+    roof: "#66b9a1",
+    image: "masjid.png",
+    icon: "moon",
+    radius: 45,
+    roadT: 2.3,
+  },
+
+  {
+    id: "maqbarah",
+    name: "Maqbarah Latihan",
+    type: "maqbarah",
+    x: -117,
+    z: -86,
+    w: 19,
+    d: 18,
+    h: 6,
+    color: "#e6dfbb",
+    roof: "#9db577",
+    image: "maqbarah.png",
+    icon: "landmark",
+    radius: 43,
+    roadT: 3.6,
+  },
+];
+
+export function newRide() {
+  return {
+    x: 0,
+    z: -225,
+    heading: Math.PI / 2,
+
+    speed: 0,
+    distance: 0,
+    offroad: false,
+
+    fuel: 3,
+    tyre: 100,
+    energy: 100,
+
+    clock: 540,
+    money: 250000,
+
+    event: null,
+    triggered: {},
+
+    lessons: [],
+    logs: [],
+  };
+}
+
+export function nearestPlace(state) {
+  return PRACTICE_PLACES.map((place) => ({
+    ...place,
+    distance: Math.hypot(
+      state.x - place.x,
+      state.z - place.z
+    ),
+  })).sort((a, b) => a.distance - b.distance)[0];
+}
+
+export function advanceRide(state, input, deltaTime) {
+  const dt = Math.max(
+    0,
+    Math.min(deltaTime, 0.05)
+  );
+
+  const radius = Math.hypot(
+    state.x / RX,
+    state.z / RZ
+  );
+
+  const onDriveway = PRACTICE_PLACES.some(
+    (place) =>
+      Math.hypot(
+        state.x - place.x,
+        state.z - place.z
+      ) < 36
+  );
+
+  state.offroad =
+    Math.abs(radius - 1) * RX > 9 &&
+    !onDriveway;
+
+  let maximum = state.offroad ? 7 : 20;
+
+  if (state.event === "tyre") {
+    maximum = 0;
+  }
+
+  if (state.fuel <= 0 || state.energy <= 0) {
+    maximum = 0;
+  }
+
+  if (input.brake) {
+    state.speed =
+      Math.sign(state.speed) *
+      Math.max(
+        0,
+        Math.abs(state.speed) - 25 * dt
+      );
+  } else if (input.reverse) {
+    state.speed = Math.max(
+      -Math.min(3, maximum),
+      state.speed - 8 * dt
+    );
+  } else if (input.gas) {
+    state.speed = Math.min(
+      maximum,
+      state.speed + 7 * dt
+    );
+  } else {
+    state.speed =
+      Math.sign(state.speed) *
+      Math.max(
+        0,
+        Math.abs(state.speed) - 2.7 * dt
+      );
+  }
+
+  if (Math.abs(state.speed) > maximum) {
+    state.speed =
+      Math.sign(state.speed) *
+      Math.max(
+        maximum,
+        Math.abs(state.speed) - 16 * dt
+      );
+  }
+
+  const steering =
+    (input.right ? 1 : 0) -
+    (input.left ? 1 : 0);
+
+  state.heading +=
+    steering *
+    Math.max(
+      -1,
+      Math.min(1, state.speed / 6)
+    ) *
+    1.15 *
+    dt;
+
+  const nextX =
+    state.x +
+    Math.sin(state.heading) * state.speed * dt;
+
+  const nextZ =
+    state.z +
+    Math.cos(state.heading) * state.speed * dt;
+
+  const outsideArena =
+    Math.abs(nextX) > 247 ||
+    Math.abs(nextZ) > 297;
+
+  const hitsBuilding = PRACTICE_PLACES.some(
+    (building) =>
+      Math.abs(nextX - building.x) <
+        building.w / 2 + 0.8 &&
+      Math.abs(nextZ - building.z) <
+        building.d / 2 + 0.8
+  );
+
+  if (outsideArena || hitsBuilding) {
+    state.speed = 0;
+  } else {
+    const moved = Math.hypot(
+      nextX - state.x,
+      nextZ - state.z
+    );
+
+    state.x = nextX;
+    state.z = nextZ;
+    state.distance += moved;
+
+    // Nilai sengaja dipercepat untuk pembelajaran.
+    // Bukan konsumsi bahan bakar kendaraan nyata.
+    state.fuel = Math.max(
+      0,
+      state.fuel - moved / 900
+    );
+
+    state.energy = Math.max(
+      0,
+      state.energy - moved / 22
+    );
+
+    state.clock += moved / 9;
+  }
+
+  const pom = PRACTICE_PLACES[0];
+  const workshop = PRACTICE_PLACES[1];
+
+  const nearPom =
+    Math.hypot(
+      state.x - pom.x,
+      state.z - pom.z
+    ) < 75;
+
+  if (
+    !state.triggered.fuel &&
+    state.distance > 30 &&
+    nearPom
+  ) {
+    state.triggered.fuel = true;
+    state.fuel = Math.min(state.fuel, 0.35);
+
+    state.logs.unshift(
+      "Latihan: bensin menipis di dekat POM."
+    );
+  }
+
+  const nearWorkshop =
+    Math.hypot(
+      state.x - workshop.x,
+      state.z - workshop.z
+    ) < 78;
+
+  if (
+    !state.triggered.tyre &&
+    state.distance > 180 &&
+    nearWorkshop
+  ) {
+    state.triggered.tyre = true;
+    state.tyre = 20;
+    state.event = "tyre";
+    state.speed = 0;
+
+    state.logs.unshift(
+      "Latihan: ban bocor di dekat bengkel. Berhenti dan pilih bantuan."
+    );
+  }
+
+  state.logs = state.logs.slice(0, 20);
+}
+
+export function serviceRide(state, id) {
+  const place = PRACTICE_PLACES.find(
+    (item) => item.id === id
+  );
+
+  if (!place) {
+    return {
+      ok: false,
+      message: "Fasilitas tidak ditemukan.",
+    };
+  }
+
+  const distance = Math.hypot(
+    state.x - place.x,
+    state.z - place.z
+  );
+
+  if (
+    distance > place.radius ||
+    Math.abs(state.speed) > 0.2
+  ) {
+    return {
+      ok: false,
+      message:
+        "Berhenti di area fasilitas terlebih dahulu.",
+    };
+  }
+
+  const costs = {
+    spbu: Math.ceil(
+      (5 - state.fuel) * 12000
+    ),
+    bengkel: 20000,
+    hotel: 40000,
+    masjid: 0,
+    maqbarah: 0,
+  };
+
+  const cost = costs[place.type];
+
+  if (state.money < cost) {
+    return {
+      ok: false,
+      message:
+        "Bekal belum cukup. Gunakan bantuan gratis melalui menu Jeda agar latihan dapat diteruskan.",
+    };
+  }
+
+  state.money -= cost;
+
+  if (place.type === "spbu") {
+    state.fuel = 5;
+  }
+
+  if (place.type === "bengkel") {
+    state.tyre = 100;
+    state.event = null;
+  }
+
+  if (
+    place.type === "hotel" ||
+    place.type === "masjid"
+  ) {
+    state.energy = 100;
+    state.clock += 360;
+  }
+
+  if (!state.lessons.includes(id)) {
+    state.lessons.push(id);
+  }
+
+  let message;
+
+  if (place.type === "spbu") {
+    message =
+      "Tangki terisi. Pelajaran pengisian bensin selesai.";
+  } else if (place.type === "bengkel") {
+    message =
+      "Ban diperbaiki. Pelajaran keselamatan selesai.";
+  } else if (
+    place.type === "hotel" ||
+    place.type === "masjid"
+  ) {
+    message =
+      "Energi pulih setelah istirahat 6 jam.";
+  } else {
+    message =
+      "Kunjungan latihan tercatat. Terima kasih sudah menjaga adab.";
+  }
+
+  state.logs.unshift(message);
+
+  return {
+    ok: true,
+    message,
+  };
+}
+
+export function helpRide(state) {
+  state.speed = 0;
+
+  state.fuel = Math.max(2, state.fuel);
+  state.tyre = 100;
+  state.event = null;
+
+  state.energy = Math.max(
+    70,
+    state.energy
+  );
+
+  state.money = Math.max(
+    75000,
+    state.money
+  );
+
+  state.clock += 30;
+
+  state.logs.unshift(
+    "Bantuan latihan gratis tiba. Perjalanan dapat dilanjutkan."
+  );
+}
+
+function makeWorld() {
+  const faces = [];
+
+  function face(points, color) {
+    faces.push({
+      points,
+      color,
+    });
+  }
+
+  function box(
+    x,
+    y,
+    z,
+    width,
+    height,
+    depth,
+    color,
+    top = shade(color, 1.08)
+  ) {
+    const a = [
+      x - width / 2,
+      y,
+      z - depth / 2,
+    ];
+
+    const b = [
+      x + width / 2,
+      y,
+      z - depth / 2,
+    ];
+
+    const c = [
+      x + width / 2,
+      y,
+      z + depth / 2,
+    ];
+
+    const d = [
+      x - width / 2,
+      y,
+      z + depth / 2,
+    ];
+
+    const lift = (point) => [
+      point[0],
+      point[1] + height,
+      point[2],
+    ];
+
+    face(
+      [a, b, lift(b), lift(a)],
+      shade(color, 0.91)
+    );
+
+    face(
+      [b, c, lift(c), lift(b)],
+      color
+    );
+
+    face(
+      [c, d, lift(d), lift(c)],
+      shade(color, 0.84)
+    );
+
+    face(
+      [d, a, lift(a), lift(d)],
+      color
+    );
+
+    face(
+      [lift(a), lift(b), lift(c), lift(d)],
+      top
+    );
+  }
+
+  function cone(
+    x,
+    y,
+    z,
+    radius,
+    height,
+    color,
+    segments = 8
+  ) {
+    for (
+      let index = 0;
+      index < segments;
+      index++
+    ) {
+      const angleA =
+        (index * TAU) / segments;
+
+      const angleB =
+        ((index + 1) * TAU) / segments;
+
+      face(
+        [
+          [
+            x + radius * Math.cos(angleA),
+            y,
+            z + radius * Math.sin(angleA),
+          ],
+          [
+            x + radius * Math.cos(angleB),
+            y,
+            z + radius * Math.sin(angleB),
+          ],
+          [x, y + height, z],
+        ],
+        shade(
+          color,
+          0.85 + (0.22 * (index % 3)) / 2
+        )
+      );
+    }
+  }
+
+  function road(a, b, width, y, color) {
+    const normal = norm([
+      -(b[1] - a[1]),
+      b[0] - a[0],
+    ]);
+
+    face(
+      [
+        [
+          a[0] + normal[0] * width,
+          y,
+          a[1] + normal[1] * width,
+        ],
+        [
+          b[0] + normal[0] * width,
+          y,
+          b[1] + normal[1] * width,
+        ],
+        [
+          b[0] - normal[0] * width,
+          y,
+          b[1] - normal[1] * width,
+        ],
+        [
+          a[0] - normal[0] * width,
+          y,
+          a[1] - normal[1] * width,
+        ],
+      ],
+      color
+    );
+  }
+
+  // Permukaan kawasan.
+  for (let x = -280; x < 280; x += 40) {
+    for (let z = -320; z < 320; z += 40) {
+      face(
+        [
+          [x, 0, z],
+          [x + 40, 0, z],
+          [x + 40, 0, z + 40],
+          [x, 0, z + 40],
+        ],
+        ((x + z) / 40) % 2
+          ? "#a6cb80"
+          : "#afd28a"
+      );
+    }
+  }
+
+  // Jalan utama melingkar.
+  for (let index = 0; index < 150; index++) {
+    const a = track(
+      (index / 150) * TAU
+    );
+
+    const b = track(
+      ((index + 1) / 150) * TAU
+    );
+
+    road(
+      a,
+      b,
+      10,
+      0.025,
+      "#efe2b5"
+    );
+
+    road(
+      a,
+      b,
+      8,
+      0.05,
+      "#7a8581"
+    );
+
+    if (index % 3 === 0) {
+      road(
+        a,
+        b,
+        0.2,
+        0.07,
+        "#fff3c9"
+      );
+    }
+  }
+
+  // Bangunan fasilitas.
+  for (const building of PRACTICE_PLACES) {
+    road(
+      track(building.roadT),
+      [building.x, building.z],
+      4,
+      0.04,
+      "#ddd4af"
+    );
+
+    box(
+      building.x,
+      0.08,
+      building.z,
+      building.w + 7,
+      0.12,
+      building.d + 8,
+      "#eae1bd"
+    );
+
+    box(
+      building.x,
+      0.2,
+      building.z,
+      building.w,
+      building.h,
+      building.d,
+      building.color
+    );
+
+    box(
+      building.x,
+      building.h + 0.2,
+      building.z,
+      building.w + 2,
+      0.8,
+      building.d + 2,
+      building.roof
+    );
+
+    const windowRows =
+      building.type === "hotel" ? 3 : 1;
+
+    for (
+      let row = 0;
+      row < windowRows;
+      row++
+    ) {
+      for (
+        let column = -2;
+        column <= 2;
+        column++
+      ) {
+        box(
+          building.x + column * 3.2,
+          2 + row * 3.5,
+          building.z -
+            building.d / 2 -
+            0.05,
+          1.6,
+          2,
+          0.12,
+          "#82b6bb",
+          "#a9d8d5"
+        );
+      }
+    }
+
+    box(
+      building.x,
+      0.2,
+      building.z -
+        building.d / 2 -
+        0.15,
+      2.5,
+      3,
+      0.2,
+      "#aa8060"
+    );
+
+    if (building.type === "masjid") {
+      cone(
+        building.x,
+        building.h + 1,
+        building.z,
+        8,
+        6,
+        "#58b59e",
+        12
+      );
+
+      box(
+        building.x - 16,
+        0,
+        building.z,
+        3,
+        17,
+        3,
+        "#fff0c5"
+      );
+
+      cone(
+        building.x - 16,
+        17,
+        building.z,
+        2.7,
+        4,
+        "#58b59e"
+      );
+    } else if (building.type === "spbu") {
+      box(
+        building.x,
+        5,
+        building.z - 11,
+        19,
+        0.7,
+        9,
+        "#e77968"
+      );
+
+      for (const offset of [-6, 6]) {
+        box(
+          building.x + offset,
+          0,
+          building.z - 11,
+          0.5,
+          5,
+          0.5,
+          "#f8e8c5"
+        );
+
+        box(
+          building.x + offset,
+          0.2,
+          building.z - 11,
+          1.6,
+          2,
+          1.2,
+          "#e88670"
+        );
+
+        box(
+          building.x + offset,
+          1.4,
+          building.z - 11 - 0.65,
+          1,
+          0.6,
+          0.1,
+          "#537e81"
+        );
+      }
+    } else if (
+      building.type === "maqbarah"
+    ) {
+      cone(
+        building.x,
+        building.h + 1,
+        building.z,
+        13,
+        6,
+        building.roof,
+        4
+      );
+
+      for (const offset of [-4, 4]) {
+        box(
+          building.x + offset,
+          0.2,
+          building.z - 4,
+          1.3,
+          1,
+          3,
+          "#e8e2cd"
+        );
+      }
+    } else if (
+      building.type === "bengkel"
+    ) {
+      box(
+        building.x,
+        0,
+        building.z -
+          building.d / 2 -
+          0.1,
+        9,
+        4.5,
+        0.2,
+        "#4c6d71"
+      );
+    }
+  }
+
+  // Pepohonan.
+  for (let index = 0; index < 100; index++) {
+    const angle = index * 2.39996;
+    const radius = index % 3 ? 1.23 : 0.55;
+
+    const x =
+      RX * Math.cos(angle) * radius;
+
+    const z =
+      RZ * Math.sin(angle) * radius;
+
+    const nearBuilding =
+      PRACTICE_PLACES.some(
+        (building) =>
+          Math.hypot(
+            x - building.x,
+            z - building.z
+          ) < 35
+      );
+
+    if (nearBuilding) continue;
+
+    box(
+      x,
+      0,
+      z,
+      1.1,
+      4,
+      1.1,
+      "#bc956b"
+    );
+
+    cone(
+      x,
+      2,
+      z,
+      4,
+      7,
+      index % 3
+        ? "#78b475"
+        : "#63a786"
+    );
+
+    cone(
+      x,
+      5,
+      z,
+      3,
+      6,
+      "#8bc17d"
+    );
+  }
+
+  // Kolam di tengah kawasan.
+  const pond = [];
+
+  for (let index = 0; index < 24; index++) {
+    const angle =
+      (index * TAU) / 24;
+
+    pond.push([
+      30 * Math.cos(angle),
+      0.02,
+      10 + 42 * Math.sin(angle),
+    ]);
+  }
+
+  face(pond, "#79c7cc");
+
+  return faces;
+}
+
+function scooter(state, party) {
+  const faces = [];
+
+  function add(points, color) {
+    const transformed = points.map(
+      ([x, y, z]) => [
+        state.x +
+          x * Math.cos(state.heading) +
+          z * Math.sin(state.heading),
+
+        y,
+
+        state.z -
+          x * Math.sin(state.heading) +
+          z * Math.cos(state.heading),
+      ]
+    );
+
+    faces.push({
+      points: transformed,
+      color,
+    });
+  }
+
+  function box(
+    x,
+    y,
+    z,
+    width,
+    height,
+    depth,
+    color,
+    top = shade(color, 1.1)
+  ) {
+    const a = [
+      x - width / 2,
+      y,
+      z - depth / 2,
+    ];
+
+    const b = [
+      x + width / 2,
+      y,
+      z - depth / 2,
+    ];
+
+    const c = [
+      x + width / 2,
+      y,
+      z + depth / 2,
+    ];
+
+    const d = [
+      x - width / 2,
+      y,
+      z + depth / 2,
+    ];
+
+    const up = (point) => [
+      point[0],
+      point[1] + height,
+      point[2],
+    ];
+
+    add(
+      [a, b, up(b), up(a)],
+      shade(color, 0.9)
+    );
+
+    add(
+      [b, c, up(c), up(b)],
+      color
+    );
+
+    add(
+      [c, d, up(d), up(c)],
+      shade(color, 0.85)
+    );
+
+    add(
+      [d, a, up(a), up(d)],
+      color
+    );
+
+    add(
+      [up(a), up(b), up(c), up(d)],
+      top
+    );
+  }
+
+  // Roda depan dan belakang.
+  for (const z of [-0.72, 0.78]) {
+    for (let index = 0; index < 10; index++) {
+      const angleA =
+        (index * TAU) / 10;
+
+      const angleB =
+        ((index + 1) * TAU) / 10;
+
+      const radius =
+        state.event === "tyre" && z < 0
+          ? 0.23
+          : 0.35;
+
+      add(
+        [
+          [
+            -0.13,
+            0.37 +
+              Math.sin(angleA) * radius,
+            z + Math.cos(angleA) * radius,
+          ],
+          [
+            0.13,
+            0.37 +
+              Math.sin(angleA) * radius,
+            z + Math.cos(angleA) * radius,
+          ],
+          [
+            0.13,
+            0.37 +
+              Math.sin(angleB) * radius,
+            z + Math.cos(angleB) * radius,
+          ],
+          [
+            -0.13,
+            0.37 +
+              Math.sin(angleB) * radius,
+            z + Math.cos(angleB) * radius,
+          ],
+        ],
+        "#354940"
+      );
+
+      for (const x of [-0.135, 0.135]) {
+        add(
+          [
+            [x, 0.37, z],
+            [
+              x,
+              0.37 +
+                Math.sin(angleA) * radius,
+              z +
+                Math.cos(angleA) * radius,
+            ],
+            [
+              x,
+              0.37 +
+                Math.sin(angleB) * radius,
+              z +
+                Math.cos(angleB) * radius,
+            ],
+          ],
+          "#54645a"
+        );
+      }
+    }
+  }
+
+  // Bodi, dek, pelindung kaki, jok, setang, dan lampu.
+  box(
+    0,
+    0.48,
+    -0.48,
+    0.66,
+    0.48,
+    1.08,
+    "#62c2aa"
+  );
+
+  box(
+    0,
+    0.47,
+    0.3,
+    0.62,
+    0.13,
+    1.1,
+    "#a7dbc0"
+  );
+
+  box(
+    0,
+    0.55,
+    0.65,
+    0.7,
+    0.86,
+    0.18,
+    "#68c8ac"
+  );
+
+  box(
+    0,
+    1.05,
+    -0.35,
+    0.61,
+    0.13,
+    1.1,
+    "#b0835b"
+  );
+
+  box(
+    0,
+    1.46,
+    0.65,
+    0.98,
+    0.07,
+    0.09,
+    "#e5e2be"
+  );
+
+  box(
+    0,
+    1.41,
+    0.76,
+    0.3,
+    0.25,
+    0.16,
+    "#fff0ba"
+  );
+
+  box(
+    0,
+    0.75,
+    -1.03,
+    0.24,
+    0.15,
+    0.04,
+    "#e6896e"
+  );
+
+  // Dua karakter sederhana mengikuti pilihan pada menu.
+  party.forEach((id, index) => {
+    const z =
+      index === 0 ? 0.02 : -0.65;
+
+    const female = [
+      "ibu",
+      "remaja-hijau",
+      "remaja-terakota",
+    ].includes(id);
+
+    let color = "#fff0d0";
+
+    if (id === "remaja-terakota") {
+      color = "#d99779";
+    } else if (id === "remaja-hijau") {
+      color = "#78b79b";
+    } else if (id === "ibu") {
+      color = "#e6d6ab";
+    }
+
+    box(
+      0,
+      1.17,
+      z,
+      0.4,
+      0.52,
+      0.34,
+      color
+    );
+
+    box(
+      -0.24,
+      0.72,
+      z,
+      0.13,
+      0.58,
+      0.22,
+      "#827056"
+    );
+
+    box(
+      0.24,
+      0.72,
+      z,
+      0.13,
+      0.58,
+      0.22,
+      "#827056"
+    );
+
+    box(
+      0,
+      1.7,
+      z,
+      0.31,
+      0.33,
+      0.3,
+      female ? color : "#ddb28e"
+    );
+
+    box(
+      0,
+      1.8,
+      z + 0.157,
+      0.2,
+      0.15,
+      0.01,
+      "#e8be98"
+    );
+
+    if (!female) {
+      box(
+        0,
+        2.01,
+        z,
+        0.33,
+        0.12,
+        0.31,
+        "#3b5846"
+      );
+    }
+
+    if (index === 0) {
+      box(
+        -0.29,
+        1.43,
+        0.36,
+        0.12,
+        0.12,
+        0.65,
+        color
+      );
+
+      box(
+        0.29,
+        1.43,
+        0.36,
+        0.12,
+        0.12,
+        0.65,
+        color
+      );
+    }
+  });
+
+  return faces;
+}
+
+export function createSceneRenderer(canvas) {
+  const context = canvas.getContext("2d", {
+    alpha: false,
+  });
+
+  if (!context) {
+    throw Error(
+      "Canvas tidak tersedia pada browser ini."
+    );
+  }
+
+  const world = makeWorld();
+
+  return function render(
+    state,
+    camera,
+    party
+  ) {
+    const width = canvas.width;
+    const height = canvas.height;
+
+    const behind = camera === "behind";
+
+    const sin = Math.sin(state.heading);
+    const cos = Math.cos(state.heading);
+
+    const eye = behind
+      ? [
+          state.x - sin * 8,
+          4.8,
+          state.z - cos * 8,
+        ]
+      : [
+          state.x,
+          60,
+          state.z - 0.1,
+        ];
+
+    const target = behind
+      ? [
+          state.x + sin * 6,
+          1,
+          state.z + cos * 6,
+        ]
+      : [
+          state.x,
+          0,
+          state.z,
+        ];
+
+    const forward = norm(
+      sub(target, eye)
+    );
+
+    const right = norm(
+      cross([0, 1, 0], forward)
+    );
+
+    const up = cross(
+      forward,
+      right
+    );
+
+    const focal =
+      Math.min(width, height) *
+      (behind ? 0.95 : 1.1);
+
+    function cameraPoint(point) {
+      const relative = sub(point, eye);
+
+      return [
+        dot(relative, right),
+        dot(relative, up),
+        dot(relative, forward),
+      ];
+    }
+
+    const sky =
+      context.createLinearGradient(
+        0,
+        0,
+        0,
+        height
+      );
+
+    sky.addColorStop(
+      0,
+      "#a8d8e3"
+    );
+
+    sky.addColorStop(
+      0.6,
+      "#edf1d0"
+    );
+
+    sky.addColorStop(
+      1,
+      "#add18b"
+    );
+
+    context.fillStyle = sky;
+    context.fillRect(
+      0,
+      0,
+      width,
+      height
+    );
+
+    const projected = [];
+
+    const allFaces = [
+      ...world,
+      ...scooter(state, party),
+    ];
+
+    for (const face of allFaces) {
+      let points = face.points.map(
+        cameraPoint
+      );
+
+      const clipped = [];
+
+      // Potong poligon pada bidang dekat kamera.
+      for (
+        let index = 0;
+        index < points.length;
+        index++
+      ) {
+        const a = points[index];
+
+        const b =
+          points[
+            (index + 1) % points.length
+          ];
+
+        const inside = a[2] > 0.3;
+        const nextInside = b[2] > 0.3;
+
+        if (inside) {
+          clipped.push(a);
+        }
+
+        if (inside !== nextInside) {
+          const amount =
+            (0.3 - a[2]) /
+            (b[2] - a[2]);
+
+          clipped.push(
+            a.map(
+              (value, component) =>
+                value +
+                (b[component] - value) *
+                  amount
+            )
+          );
+        }
+      }
+
+      if (clipped.length < 3) {
+        continue;
+      }
+
+      const depth =
+        clipped.reduce(
+          (total, point) =>
+            total + point[2],
+          0
+        ) / clipped.length;
+
+      points = clipped.map(
+        (point) => [
+          width / 2 +
+            (point[0] / point[2]) *
+              focal,
+
+          height / 2 -
+            (point[1] / point[2]) *
+              focal,
+        ]
+      );
+
+      const outsideScreen =
+        points.every(
+          (point) => point[0] < 0
+        ) ||
+        points.every(
+          (point) => point[0] > width
+        ) ||
+        points.every(
+          (point) => point[1] < 0
+        ) ||
+        points.every(
+          (point) => point[1] > height
+        );
+
+      if (outsideScreen) {
+        continue;
+      }
+
+      projected.push({
+        points,
+        depth,
+        color: face.color,
+      });
+    }
+
+    projected.sort(
+      (a, b) => b.depth - a.depth
+    );
+
+    for (const face of projected) {
+      context.beginPath();
+
+      face.points.forEach(
+        (point, index) => {
+          if (index === 0) {
+            context.moveTo(
+              point[0],
+              point[1]
+            );
+          } else {
+            context.lineTo(
+              point[0],
+              point[1]
+            );
+          }
+        }
+      );
+
+      context.closePath();
+      context.fillStyle = face.color;
+      context.fill();
+    }
+
+    // Papan nama fasilitas yang dekat dengan pemain.
+    const ratio =
+      width /
+      Math.max(1, canvas.clientWidth);
+
+    for (const place of PRACTICE_PLACES) {
+      const distance = Math.hypot(
+        state.x - place.x,
+        state.z - place.z
+      );
+
+      if (distance > 140) {
+        continue;
+      }
+
+      const position = cameraPoint([
+        place.x,
+        place.h + 5,
+        place.z,
+      ]);
+
+      if (position[2] < 1) {
+        continue;
+      }
+
+      const screenX =
+        width / 2 +
+        (position[0] / position[2]) *
+          focal;
+
+      const screenY =
+        height / 2 -
+        (position[1] / position[2]) *
+          focal;
+
+      if (
+        screenX < 20 ||
+        screenX > width - 20 ||
+        screenY < 30 ||
+        screenY > height - 60
+      ) {
+        continue;
+      }
+
+      context.font =
+        `bold ${11 * ratio}px Arial`;
+
+      const labelWidth =
+        context.measureText(place.name).width +
+        18 * ratio;
+
+      context.fillStyle = "#fff9e9";
+
+      context.fillRect(
+        screenX - labelWidth / 2,
+        screenY - 14 * ratio,
+        labelWidth,
+        24 * ratio
+      );
+
+      context.fillStyle = "#42654b";
+      context.textAlign = "center";
+
+      context.fillText(
+        place.name,
+        screenX,
+        screenY + 2 * ratio
+      );
+    }
+  };
+}
+</file>
+
+<file path="lib/game-engine.mjs">
+import { CHARACTERS, INITIAL_POSITION, PLACE_TYPES } from "./catalog.mjs";
+import { SEED_LOCATIONS, DEMO_LOCATIONS } from "./locations.mjs";
+import { cumulativeDistances, distanceMeters, positionAtDistance, validCoordinate } from "./geo.mjs";
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, Number(v) || 0));
+const builtins = [...SEED_LOCATIONS, ...DEMO_LOCATIONS];
+const partyIsValid = ids => Array.isArray(ids) && ids.length === 2 && new Set(ids).size === 2 && ids.every(id => CHARACTERS.some(c => c.id === id));
+
+export function createGame() {
+  return {
+    version: 1, party: [], locations: builtins.map(p => ({ ...p, coordinates: [...p.coordinates] })),
+    position: [...INITIAL_POSITION], plan: ["sunan-giri"], route: null, leg: 0, progressM: 0,
+    status: "idle", arrivedId: "sunan-ampel", clock: 540, speed: 60, fuel: 4, money: 450000,
+    energy: [100, 100], tyre: 95, spark: 95, inventory: { tyre: 1, spark: 2, fuel: 2 },
+    event: null, rng: 736519, incidentM: 0, eventCooldown: 0, visits: [], sequence: 1,
+    logs: [{ id: 1, clock: 540, text: "Perjalanan dimulai dari kawasan Sunan Ampel.", kind: "info" }],
+  };
+}
+
+function entry(s, text, kind = "info") {
+  const sequence = s.sequence + 1;
+  return { ...s, sequence, logs: [{ id: sequence, clock: s.clock, text, kind }, ...s.logs].slice(0, 50) };
+}
+
+function stoppedStatus(s, event = s.event) {
+  if (event) return "broken";
+  if (s.route && s.progressM >= s.route.stops[s.leg].endM - 0.1 && s.arrivedId === s.route.targetIds[s.leg]) return "arrived";
+  return s.route ? "paused" : "idle";
+}
+
+export function validateLocation(p) {
+  if (!p || typeof p !== "object") throw Error("Data lokasi tidak valid.");
+  const name = String(p.name || "").trim(), type = String(p.type || ""), source = String(p.source || "").trim();
+  if (!name || name.length > 100) throw Error("Nama lokasi wajib diisi, maksimal 100 karakter.");
+  if (!Object.hasOwn(PLACE_TYPES, type)) throw Error("Pilih jenis lokasi.");
+  if (!validCoordinate(p.coordinates)) throw Error("Koordinat berada di luar jangkauan peta Indonesia.");
+  if (source && (!URL.canParse(source) || !["https:", "http:"].includes(new URL(source).protocol))) throw Error("Sumber harus berupa tautan http atau https.");
+  return {
+    id: String(p.id || "").slice(0, 100), name, type, coordinates: [...p.coordinates],
+    person: String(p.person || "").trim().slice(0, 120), region: String(p.region || "").trim().slice(0, 140),
+    history: String(p.history || "").trim().slice(0, 6000), source: source.slice(0, 1000),
+    custom: !!p.custom, simulation: !!p.simulation, canRest: type === "hotel" || (type === "masjid" && !!p.canRest),
+  };
+}
+
+export function canUsePlace(s, p) {
+  return !!p && (s.arrivedId === p.id || distanceMeters(s.position, p.coordinates) <= 250);
+}
+
+function checkedRoute(r, locations) {
+  if (!r || typeof r.id !== "string" || !Array.isArray(r.coordinates) || r.coordinates.length < 2 || r.coordinates.length > 30000 || !r.coordinates.every(validCoordinate)) return null;
+  if (!Array.isArray(r.targetIds) || !r.targetIds.length || r.targetIds.length > 8 || new Set(r.targetIds).size !== r.targetIds.length || !r.targetIds.every(id => locations.some(p => p.id === id))) return null;
+  if (!Array.isArray(r.stops) || r.stops.length !== r.targetIds.length || !r.stops.every(t => Number.isInteger(t.endIndex) && t.endIndex > 0 && t.endIndex < r.coordinates.length)) return null;
+  if (!Number.isFinite(r.durationSec) || r.durationSec <= 0 || r.durationSec > 31536000) return null;
+  const cumulative = cumulativeDistances(r.coordinates), distanceM = cumulative.at(-1);
+  const stops = r.stops.map(t => ({ endIndex: t.endIndex, endM: cumulative[t.endIndex] }));
+  if (!(distanceM > 0) || stops.at(-1).endIndex !== r.coordinates.length - 1 || !stops.every((t, i) => (i === 0 || t.endM > stops[i - 1].endM) && distanceMeters(r.coordinates[t.endIndex], locations.find(p => p.id === r.targetIds[i]).coordinates) < 1500)) return null;
+  return { id: r.id, coordinates: r.coordinates, cumulative, distanceM, durationSec: r.durationSec, stops, targetIds: [...r.targetIds], source: String(r.source || "Rute jalan").slice(0, 100), retrieved: String(r.retrieved || "").slice(0, 30) };
+}
+
+export function advanceGame(s, elapsedMs) {
+  if (s.status !== "moving" || !s.route || s.event) return s;
+  const r = s.route, stop = r.stops[s.leg];
+  if (!stop) return s;
+  const seconds = clamp(elapsedMs, 0, 2000) / 1000 * s.speed, rate = r.distanceM / r.durationSec;
+  const requested = Math.min(seconds * rate, Math.max(0, stop.endM - s.progressM));
+  const actual = Math.min(requested, s.fuel * 38000), progressM = s.progressM + actual;
+  let n = {
+    ...s, progressM, position: positionAtDistance(r, progressM), clock: s.clock + actual / rate / 60,
+    fuel: Math.max(0, s.fuel - actual / 38000), energy: s.energy.map(e => Math.max(0, e - actual / 20000)),
+    tyre: Math.max(0, s.tyre - actual / 25000), spark: Math.max(0, s.spark - actual / 35000), incidentM: s.incidentM + actual,
+  };
+  if (progressM >= stop.endM - 0.1) {
+    const p = s.locations.find(p => p.id === r.targetIds[s.leg]);
+    return entry({ ...n, status: "arrived", arrivedId: p.id }, `Tiba di ${p.name}.`, "arrival");
+  }
+  if (requested > actual + 0.01 || n.fuel <= 0.000001) return entry({ ...n, fuel: 0, status: "broken", event: "fuel" }, "Bensin habis. Isi dari jeriken atau panggil bantuan.", "event");
+  if (n.energy.some(e => e <= 0)) return entry({ ...n, status: "paused" }, "Energi habis. Beristirahat atau gunakan bantuan singgah.", "event");
+  while (n.incidentM >= 5000) {
+    const rng = (Math.imul(n.rng, 1664525) + 1013904223) >>> 0;
+    n = { ...n, rng, incidentM: n.incidentM - 5000 };
+    if (n.clock < n.eventCooldown) continue;
+    const risk = n.tyre < 35 || n.spark < 35 ? 0.12 : 0.018, value = rng / 4294967296;
+    if (value < risk || n.tyre <= 0 || n.spark <= 0) {
+      const event = n.tyre <= 0 ? "tyre" : n.spark <= 0 ? "spark" : value < risk * 0.6 ? "tyre" : "spark";
+      return entry({ ...n, event, status: "broken", eventCooldown: n.clock + 45 }, event === "tyre" ? "Ban bocor. Ganti ban cadangan atau panggil bengkel." : "Busi mati. Ganti busi cadangan atau panggil bengkel.", "event");
+    }
+  }
+  return n;
+}
+
+export function gameReducer(s, a) {
+  switch (a.type) {
+    case "HYDRATE": return a.state;
+    case "PARTY":
+      return partyIsValid(a.ids) ? entry({ ...s, party: [...a.ids], status: s.status === "moving" ? "paused" : s.status }, "Teman perjalanan sudah dipilih.") : s;
+    case "PLAN": {
+      const ids = a.ids;
+      if (s.status === "moving" || !Array.isArray(ids) || ids.length > 8 || new Set(ids).size !== ids.length || ids.some(id => !s.locations.some(p => p.id === id))) return s;
+      return { ...s, plan: [...ids], route: null, progressM: 0, leg: 0, status: s.event ? "broken" : "idle" };
+    }
+    case "ROUTE": {
+      const r = checkedRoute(a.route, s.locations);
+      if (s.status === "moving" || !r || r.targetIds.join("|") !== s.plan.join("|") || distanceMeters(s.position, r.coordinates[0]) > 1500) return s;
+      return entry({ ...s, route: r, leg: 0, progressM: 0, status: s.event ? "broken" : "ready" }, "Rute jalan siap. Periksa bekal, lalu berangkat.");
+    }
+    case "START": {
+      if (!partyIsValid(s.party) || !s.route || s.event || s.energy.some(e => e <= 0)) return s;
+      if (s.fuel <= 0) return entry({ ...s, status: "broken", event: "fuel" }, "Tangki kosong. Isi bensin sebelum melanjutkan.", "event");
+      if (s.status === "arrived") return s.leg < s.route.targetIds.length - 1 ? { ...s, leg: s.leg + 1, status: "moving", arrivedId: null } : s;
+      return ["ready", "paused"].includes(s.status) ? { ...s, status: "moving", arrivedId: null } : s;
+    }
+    case "PAUSE": return s.status === "moving" ? { ...s, status: "paused" } : s;
+    case "TICK": return advanceGame(s, a.elapsedMs);
+    case "SPEED": return [60, 180, 600].includes(a.speed) ? { ...s, speed: a.speed } : s;
+    case "WAIT":
+      return s.status !== "moving" && [60, 360].includes(a.minutes) ? entry({ ...s, clock: s.clock + a.minutes, energy: s.energy.map(e => Math.max(0, e - a.minutes / 120)) }, `Menunggu ${a.minutes / 60} jam.`) : s;
+    case "LOCATION": {
+      if (s.status === "moving") return s;
+      let p; try { p = validateLocation(a.location); } catch { return s; }
+      if (!p.id) return s;
+      const old = s.locations.find(l => l.id === p.id);
+      if (!old && s.locations.length >= 113) return s;
+      p = { ...p, custom: old ? old.custom : true, simulation: old ? old.simulation : false };
+      const moved = old && distanceMeters(old.coordinates, p.coordinates) > 0.1;
+      const invalidates = moved && s.route?.targetIds.includes(p.id);
+      const locations = old ? s.locations.map(l => l.id === p.id ? p : l) : [...s.locations, p];
+      return entry({ ...s, locations, ...(invalidates ? { route: null, progressM: 0, leg: 0, status: s.event ? "broken" : "idle" } : {}), arrivedId: moved && s.arrivedId === p.id ? null : s.arrivedId }, `${old ? "Memperbarui" : "Menambahkan"} ${p.name}.`);
+    }
+    case "DELETE_LOCATION": {
+      const p = s.locations.find(p => p.id === a.id);
+      if (!p?.custom || s.status === "moving" || s.route?.targetIds.includes(a.id)) return s;
+      return { ...s, locations: s.locations.filter(p => p.id !== a.id), plan: s.plan.filter(id => id !== a.id), arrivedId: s.arrivedId === a.id ? null : s.arrivedId };
+    }
+    case "VISIT": {
+      const p = s.locations.find(p => p.id === s.arrivedId);
+      if (!partyIsValid(s.party) || p?.type !== "maqbarah" || !canUsePlace(s, p)) return s;
+      const key = `${s.route?.id || "start"}:${s.leg}:${p.id}`;
+      if (s.visits.some(v => v.key === key)) return s;
+      return entry({ ...s, visits: [...s.visits, { key, locationId: p.id, name: p.name, clock: s.clock, party: [...s.party] }].slice(-500) }, `Kunjungan ke ${p.name} dicatat.`, "visit");
+    }
+    case "REPAIR": {
+      if (!s.event || s.status === "moving") return s;
+      const inventory = { ...s.inventory }, n = { ...s, inventory, event: null, status: stoppedStatus(s, null) };
+      if (s.event === "fuel") {
+        const amt = Math.min(inventory.fuel, 5.5 - s.fuel); if (amt <= 0) return s;
+        n.fuel += amt; inventory.fuel -= amt;
+      } else {
+        if (inventory[s.event] < 1) return s;
+        inventory[s.event] -= 1; if (s.event === "tyre") n.tyre = 100; else n.spark = 100;
+      }
+      return entry(n, "Perbaikan selesai. Perjalanan dapat dilanjutkan.");
+    }
+    case "HELP": {
+      if (s.status === "moving" || (!s.event && s.energy.every(e => e > 0))) return s;
+      return entry({ ...s, event: null, status: stoppedStatus(s, null), clock: s.clock + 30, money: Math.max(0, s.money - 25000), fuel: Math.max(s.fuel, 2), tyre: Math.max(75, s.tyre), spark: Math.max(75, s.spark), energy: s.energy.map(e => Math.max(e, 60)) }, s.money < 25000 ? "Bantuan darurat tiba. Biaya disesuaikan sisa bekal." : "Bantuan bengkel tiba. Biaya simulasi Rp25.000.");
+    }
+    case "SERVICE": {
+      const p = s.locations.find(p => p.id === a.id);
+      if (!canUsePlace(s, p) || s.status === "moving") return s;
+      if (a.service === "fuel" && p.type === "spbu") {
+        const amt = Math.min(5.5 - s.fuel, s.money / 12000); if (amt <= 0) return s;
+        const event = s.event === "fuel" ? null : s.event;
+        return entry({ ...s, fuel: s.fuel + amt, money: Math.max(0, s.money - Math.ceil(amt * 12000)), event, status: stoppedStatus(s, event) }, "Mengisi bahan bakar di POM bensin.");
+      }
+      if (a.service === "workshop" && p.type === "bengkel" && s.money >= 20000) {
+        const event = s.event === "fuel" ? "fuel" : null;
+        return entry({ ...s, tyre: 100, spark: 100, money: s.money - 20000, inventory: { ...s.inventory, tyre: Math.max(1, s.inventory.tyre), spark: Math.max(2, s.inventory.spark) }, event, status: stoppedStatus(s, event) }, "Servis Vespa dan melengkapi suku cadang.");
+      }
+      if (a.service === "rest" && p.canRest && !s.event) {
+        const cost = p.type === "hotel" ? 50000 : 0; if (s.money < cost) return s;
+        const mod = s.clock % 1440, clock = a.untilMorning ? s.clock + (mod < 360 ? 360 - mod : 1800 - mod) : s.clock + 360;
+        return entry({ ...s, clock, energy: [100, 100], money: s.money - cost, status: stoppedStatus(s) }, `Selesai beristirahat di ${p.name}.`);
+      }
+      return s;
+    }
+    case "REFUEL_CAN": {
+      if (s.status === "moving" || s.inventory.fuel <= 0 || s.fuel >= 5.5) return s;
+      const amt = Math.min(s.inventory.fuel, 5.5 - s.fuel), event = s.event === "fuel" ? null : s.event;
+      return entry({ ...s, fuel: s.fuel + amt, inventory: { ...s.inventory, fuel: s.inventory.fuel - amt }, event, status: stoppedStatus(s, event) }, "Mengisi bahan bakar dari jeriken.");
+    }
+    case "TRIGGER_EVENT": {
+      if (s.event || !["fuel", "tyre", "spark"].includes(a.event)) return s;
+      return entry({ ...s, event: a.event, status: "broken", ...(a.event === "fuel" ? { fuel: 0 } : {}) }, `Uji kejadian: ${a.event === "fuel" ? "bensin habis" : a.event === "tyre" ? "ban bocor" : "busi mati"}.`, "event");
+    }
+    default: return s;
+  }
+}
+
+export function restoreGame(raw) {
+  let x; try { x = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { return null; }
+  if (!x || x.version !== 1 || !Array.isArray(x.locations) || x.locations.length > 113) return null;
+  const initial = createGame(), locations = [], ids = new Set();
+  try {
+    for (const item of x.locations) {
+      const p = validateLocation(item), builtin = builtins.find(b => b.id === p.id);
+      if (!p.id || ids.has(p.id)) return null;
+      ids.add(p.id); locations.push({ ...p, custom: !builtin, simulation: !!builtin?.simulation });
+    }
+  } catch { return null; }
+  for (const p of builtins) if (!ids.has(p.id)) { locations.push({ ...p }); ids.add(p.id); }
+  if (locations.length > 113) return null;
+  const n = {
+    ...initial, locations, party: partyIsValid(x.party) ? [...x.party] : [],
+    position: validCoordinate(x.position) ? [...x.position] : initial.position,
+    clock: clamp(x.clock, 0, 5256000), fuel: clamp(x.fuel, 0, 5.5), money: clamp(x.money, 0, 1e9),
+    energy: Array.isArray(x.energy) && x.energy.length === 2 ? x.energy.map(e => clamp(e, 0, 100)) : [100, 100],
+    tyre: clamp(x.tyre, 0, 100), spark: clamp(x.spark, 0, 100), speed: [60, 180, 600].includes(x.speed) ? x.speed : 60,
+    arrivedId: ids.has(x.arrivedId) ? x.arrivedId : null,
+    inventory: { tyre: Math.floor(clamp(x.inventory?.tyre, 0, 99)), spark: Math.floor(clamp(x.inventory?.spark, 0, 99)), fuel: clamp(x.inventory?.fuel, 0, 20) },
+    event: ["fuel", "tyre", "spark"].includes(x.event) ? x.event : null, rng: Number.isInteger(x.rng) ? x.rng >>> 0 : initial.rng,
+    eventCooldown: clamp(x.eventCooldown, 0, 5256000), incidentM: clamp(x.incidentM, 0, 5000),
+    plan: Array.isArray(x.plan) ? [...new Set(x.plan)].filter(id => ids.has(id)).slice(0, 8) : [],
+    visits: Array.isArray(x.visits) ? x.visits.filter(v => typeof v?.key === "string" && ids.has(v.locationId) && typeof v.name === "string" && Number.isFinite(v.clock)).slice(-500).map(v => ({ key: v.key.slice(0, 250), locationId: v.locationId, name: v.name.slice(0, 100), clock: clamp(v.clock, 0, 5256000), party: partyIsValid(v.party) ? [...v.party] : [] })) : [],
+    logs: Array.isArray(x.logs) ? x.logs.filter(l => typeof l?.text === "string" && Number.isFinite(l.clock)).slice(0, 49).map((l, i) => ({ id: i + 1, text: l.text.slice(0, 500), clock: clamp(l.clock, 0, 5256000), kind: ["info", "event", "arrival", "visit"].includes(l.kind) ? l.kind : "info" })) : initial.logs,
+  };
+  n.sequence = n.logs.length + 1;
+  const r = checkedRoute(x.route, locations);
+  if (r && r.targetIds.join("|") === n.plan.join("|")) {
+    n.route = r; n.leg = Math.floor(clamp(x.leg, 0, r.stops.length - 1));
+    n.progressM = clamp(x.progressM, n.leg ? r.stops[n.leg - 1].endM : 0, r.stops[n.leg].endM);
+    n.position = positionAtDistance(r, n.progressM);
+    n.arrivedId = n.progressM >= r.stops[n.leg].endM - 0.1 ? r.targetIds[n.leg] : null;
+    n.status = stoppedStatus(n);
+  } else if (n.arrivedId && distanceMeters(n.position, locations.find(p => p.id === n.arrivedId).coordinates) > 1500) n.arrivedId = null;
+  if (n.event) n.status = "broken";
+  return entry(n, "Perjalanan tersimpan berhasil dimuat.");
+}
+</file>
+
+<file path="lib/geo.mjs">
+export function validCoordinate(p){return Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)&&p[0]>=94&&p[0]<=142&&p[1]>=-11.5&&p[1]<=6.5;}
+export function distanceMeters(a,b){const r=Math.PI/180,p=(b[1]-a[1])*r,q=(b[0]-a[0])*r,x=Math.sin(p/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(q/2)**2;return 6371000*2*Math.atan2(Math.sqrt(x),Math.sqrt(Math.max(0,1-x)));}
+export function cumulativeDistances(c){let t=0;return c.map((p,i)=>{if(i)t+=distanceMeters(c[i-1],p);return t;});}
+export function positionAtDistance(r,d){const c=r.coordinates,t=r.cumulative,last=t.length-1;if(d<=0)return c[0];if(d>=t[last])return c[last];let lo=1,hi=last;while(lo<hi){const m=(lo+hi)>>1;if(t[m]<d)lo=m+1;else hi=m;}const f=(d-t[lo-1])/(t[lo]-t[lo-1]||1);return c[lo].map((v,i)=>c[lo-1][i]+(v-c[lo-1][i])*f);}
+export function decodePolyline(s,precision=6){if(typeof s!=="string"||s.length>2000000)throw Error("Bentuk rute tidak valid.");let i=0,lat=0,lon=0;const c=[],f=10**precision;
+const read=()=>{let n=0,shift=0,b;do{if(i>=s.length||shift>30)throw Error("Bentuk rute terpotong.");b=s.charCodeAt(i++)-63;if(b<0||b>63)throw Error("Bentuk rute tidak valid.");n|=(b&31)<<shift;shift+=5;}while(b>=32);return n&1?~(n>>1):n>>1;};
+while(i<s.length){lat+=read();lon+=read();c.push([lon/f,lat/f]);}return c;}
+export function normalizeRoute(d){const legs=d?.trip?.legs;if(!Array.isArray(legs)||!legs.length||legs.length>8)throw Error("Rute tidak ditemukan.");const coordinates=[],stops=[];let durationSec=0;
+for(const leg of legs){const points=decodePolyline(leg.shape),time=Number(leg.summary?.time);if(points.length<2||points.some(p=>!validCoordinate(p))||!Number.isFinite(time)||time<=0)throw Error("Data rute tidak valid.");coordinates.push(...(coordinates.length?points.slice(1):points));durationSec+=time;stops.push({endIndex:coordinates.length-1});}
+const cumulative=cumulativeDistances(coordinates),distanceM=cumulative.at(-1);if(!Number.isFinite(distanceM)||distanceM<=0)throw Error("Jarak rute tidak valid.");return {coordinates,cumulative,distanceM,durationSec,stops:stops.map(s=>({...s,endM:cumulative[s.endIndex]}))};}
+</file>
+
+<file path="lib/locations.mjs">
+export const SEED_LOCATIONS = [
+  {
+    "id": "sunan-ampel",
+    "type": "maqbarah",
+    "name": "Makam Sunan Ampel",
+    "person": "Sunan Ampel",
+    "region": "Ampel, Surabaya",
+    "coordinates": [
+      112.7422732,
+      -7.2299754
+    ],
+    "history": "",
+    "source": "https://www.openstreetmap.org/node/10285718924",
+    "custom": false,
+    "canRest": false
+  },
+  {
+    "id": "sunan-giri",
+    "type": "maqbarah",
+    "name": "Makam Sunan Giri",
+    "person": "Sunan Giri",
+    "region": "Kebomas, Gresik",
+    "coordinates": [
+      112.6310331,
+      -7.1688945
+    ],
+    "history": "",
+    "source": "https://www.openstreetmap.org/way/648801255",
+    "custom": false,
+    "canRest": false
+  },
+  {
+    "id": "sunan-gresik",
+    "type": "maqbarah",
+    "name": "Makam Sunan Gresik",
+    "person": "Maulana Malik Ibrahim",
+    "region": "Gapuro Sukolilo, Gresik",
+    "coordinates": [
+      112.6565,
+      -7.1607
+    ],
+    "history": "",
+    "source": "https://direktoripariwisata.id/unit/4897",
+    "custom": false,
+    "canRest": false
+  },
+  {
+    "id": "sunan-drajat",
+    "type": "maqbarah",
+    "name": "Makam Sunan Drajat",
+    "person": "Sunan Drajat",
+    "region": "Paciran, Lamongan",
+    "coordinates": [
+      112.3892583,
+      -6.884424
+    ],
+    "history": "",
+    "source": "https://www.openstreetmap.org/node/10285705417",
+    "custom": false,
+    "canRest": false
+  },
+  {
+    "id": "sunan-bonang",
+    "type": "maqbarah",
+    "name": "Makam Sunan Bonang",
+    "person": "Sunan Bonang",
+    "region": "Kutorejo, Tuban",
+    "coordinates": [
+      112.0633171,
+      -6.8945426
+    ],
+    "history": "",
+    "source": "https://www.openstreetmap.org/relation/13930238",
+    "custom": false,
+    "canRest": false
+  },
+  {
+    "id": "sunan-kudus",
+    "type": "maqbarah",
+    "name": "Makam Sunan Kudus",
+    "person": "Sunan Kudus",
+    "region": "Kauman, Kudus",
+    "coordinates": [
+      110.832835,
+      -6.804199
+    ],
+    "history": "",
+    "source": "https://simas.kemenag.go.id/profil/masjid/01.5.14.19.02.000001",
+    "custom": false,
+    "canRest": false
+  },
+  {
+    "id": "sunan-muria",
+    "type": "maqbarah",
+    "name": "Makam Sunan Muria",
+    "person": "Sunan Muria",
+    "region": "Colo, Kudus",
+    "coordinates": [
+      110.8988913,
+      -6.6661402
+    ],
+    "history": "",
+    "source": "https://www.openstreetmap.org/node/3907892232",
+    "custom": false,
+    "canRest": false
+  },
+  {
+    "id": "sunan-kalijaga",
+    "type": "maqbarah",
+    "name": "Makam Sunan Kalijaga",
+    "person": "Sunan Kalijaga",
+    "region": "Kadilangu, Demak",
+    "coordinates": [
+      110.6481794,
+      -6.9106913
+    ],
+    "history": "",
+    "source": "https://direktoripariwisata.id/pdf/2612",
+    "custom": false,
+    "canRest": false
+  },
+  {
+    "id": "sunan-gunung-jati",
+    "type": "maqbarah",
+    "name": "Makam Sunan Gunung Jati",
+    "person": "Sunan Gunung Jati",
+    "region": "Astana, Cirebon",
+    "coordinates": [
+      108.5400589,
+      -6.6711938
+    ],
+    "history": "",
+    "source": "https://www.openstreetmap.org/way/538435100",
+    "custom": false,
+    "canRest": false
+  }
+];
+
+// These facilities exist only in the game. Their labels must remain explicit.
+export const DEMO_LOCATIONS = [
+  {id:"demo-spbu",type:"spbu",name:"POM bensin simulasi Ampel",region:"Fasilitas simulasi di sekitar titik awal",coordinates:[112.7428,-7.2295]},
+  {id:"demo-masjid",type:"masjid",name:"Masjid singgah simulasi Ampel",region:"Fasilitas simulasi di sekitar titik awal",coordinates:[112.7417,-7.2306],canRest:true},
+  {id:"demo-bengkel",type:"bengkel",name:"Bengkel simulasi Giri",region:"Fasilitas simulasi di sekitar tujuan",coordinates:[112.6304,-7.1693]},
+  {id:"demo-hotel",type:"hotel",name:"Hotel simulasi Giri",region:"Fasilitas simulasi di sekitar tujuan",coordinates:[112.6316,-7.1685],canRest:true},
+].map(p=>({...p,person:"",history:"Lokasi contoh untuk mencoba fasilitas permainan. Titik ini bukan penanda fasilitas nyata.",source:"",custom:false,simulation:true,canRest:!!p.canRest}));
+</file>
+
+<file path="lib/party.mjs">
+import { CHARACTERS } from "./catalog.mjs";
+
+export const PARTY_STORAGE_KEY = "ziarah-walisongo.party.v1";
+
+export function isValidParty(ids) {
+  return Array.isArray(ids) && ids.length === 2 && new Set(ids).size === 2 && ids.every(id => CHARACTERS.some(c => c.id === id));
+}
+
+export function parseParty(raw) {
+  try {
+    const saved = JSON.parse(raw);
+    return saved?.version === 1 && isValidParty(saved.ids) ? [...saved.ids] : null;
+  } catch { return null; }
+}
+</file>
+
+<file path="public/file.svg">
+<svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
+</file>
+
+<file path="public/globe.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><g clip-path="url(#a)"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.27 14.1a6.5 6.5 0 0 0 3.67-3.45q-1.24.21-2.7.34-.31 1.83-.97 3.1M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.48-1.52a7 7 0 0 1-.96 0H7.5a4 4 0 0 1-.84-1.32q-.38-.89-.63-2.08a40 40 0 0 0 3.92 0q-.25 1.2-.63 2.08a4 4 0 0 1-.84 1.31zm2.94-4.76q1.66-.15 2.95-.43a7 7 0 0 0 0-2.58q-1.3-.27-2.95-.43a18 18 0 0 1 0 3.44m-1.27-3.54a17 17 0 0 1 0 3.64 39 39 0 0 1-4.3 0 17 17 0 0 1 0-3.64 39 39 0 0 1 4.3 0m1.1-1.17q1.45.13 2.69.34a6.5 6.5 0 0 0-3.67-3.44q.65 1.26.98 3.1M8.48 1.5l.01.02q.41.37.84 1.31.38.89.63 2.08a40 40 0 0 0-3.92 0q.25-1.2.63-2.08a4 4 0 0 1 .85-1.32 7 7 0 0 1 .96 0m-2.75.4a6.5 6.5 0 0 0-3.67 3.44 29 29 0 0 1 2.7-.34q.31-1.83.97-3.1M4.58 6.28q-1.66.16-2.95.43a7 7 0 0 0 0 2.58q1.3.27 2.95.43a18 18 0 0 1 0-3.44m.17 4.71q-1.45-.12-2.69-.34a6.5 6.5 0 0 0 3.67 3.44q-.65-1.27-.98-3.1" fill="#666"/></g><defs><clipPath id="a"><path fill="#fff" d="M0 0h16v16H0z"/></clipPath></defs></svg>
+</file>
+
+<file path="public/next.svg">
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 394 80"><path fill="#000" d="M262 0h68.5v12.7h-27.2v66.6h-13.6V12.7H262V0ZM149 0v12.7H94v20.4h44.3v12.6H94v21h55v12.6H80.5V0h68.7zm34.3 0h-17.8l63.8 79.4h17.9l-32-39.7 32-39.6h-17.9l-23 28.6-23-28.6zm18.3 56.7-9-11-27.1 33.7h17.8l18.3-22.7z"/><path fill="#000" d="M81 79.3 17 0H0v79.3h13.6V17l50.2 62.3H81Zm252.6-.4c-1 0-1.8-.4-2.5-1s-1.1-1.6-1.1-2.6.3-1.8 1-2.5 1.6-1 2.6-1 1.8.3 2.5 1a3.4 3.4 0 0 1 .6 4.3 3.7 3.7 0 0 1-3 1.8zm23.2-33.5h6v23.3c0 2.1-.4 4-1.3 5.5a9.1 9.1 0 0 1-3.8 3.5c-1.6.8-3.5 1.3-5.7 1.3-2 0-3.7-.4-5.3-1s-2.8-1.8-3.7-3.2c-.9-1.3-1.4-3-1.4-5h6c.1.8.3 1.6.7 2.2s1 1.2 1.6 1.5c.7.4 1.5.5 2.4.5 1 0 1.8-.2 2.4-.6a4 4 0 0 0 1.6-1.8c.3-.8.5-1.8.5-3V45.5zm30.9 9.1a4.4 4.4 0 0 0-2-3.3 7.5 7.5 0 0 0-4.3-1.1c-1.3 0-2.4.2-3.3.5-.9.4-1.6 1-2 1.6a3.5 3.5 0 0 0-.3 4c.3.5.7.9 1.3 1.2l1.8 1 2 .5 3.2.8c1.3.3 2.5.7 3.7 1.2a13 13 0 0 1 3.2 1.8 8.1 8.1 0 0 1 3 6.5c0 2-.5 3.7-1.5 5.1a10 10 0 0 1-4.4 3.5c-1.8.8-4.1 1.2-6.8 1.2-2.6 0-4.9-.4-6.8-1.2-2-.8-3.4-2-4.5-3.5a10 10 0 0 1-1.7-5.6h6a5 5 0 0 0 3.5 4.6c1 .4 2.2.6 3.4.6 1.3 0 2.5-.2 3.5-.6 1-.4 1.8-1 2.4-1.7a4 4 0 0 0 .8-2.4c0-.9-.2-1.6-.7-2.2a11 11 0 0 0-2.1-1.4l-3.2-1-3.8-1c-2.8-.7-5-1.7-6.6-3.2a7.2 7.2 0 0 1-2.4-5.7 8 8 0 0 1 1.7-5 10 10 0 0 1 4.3-3.5c2-.8 4-1.2 6.4-1.2 2.3 0 4.4.4 6.2 1.2 1.8.8 3.2 2 4.3 3.4 1 1.4 1.5 3 1.5 5h-5.8z"/></svg>
+</file>
+
+<file path="public/vercel.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
+</file>
+
+<file path="public/window.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
+</file>
+
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+</file>
+
+<file path="AGENTS.md">
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
+</file>
+
+<file path="eslint.config.mjs">
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+</file>
+
+<file path="jsconfig.json">
+{
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./*"]
+    }
+  }
+}
+</file>
+
+<file path="next.config.mjs">
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  /* config options here */
+  experimental: {
+    agentFeedback: true,
+  },
+  cacheComponents: true,
+  partialPrefetching: true,
+  turbopack: {
+    rules: {
+      "*.css": {
+        loaders: ["@tailwindcss/turbopack"],
+        as: "*.css",
+      },
+    },
+  },
+};
+
+export default nextConfig;
+</file>
+
+<file path="README.md">
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+</file>
+
+<file path="app/globals.css">
+:root{--paper:#f5f4ee;--white:#fffefa;--ink:#263d33;--muted:#7b8178;--green:#42664e;--deep:#233e32;--line:#e6e8df;--soft:#edf1e7;--gold:#b99c61}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,Helvetica,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}button,input,select,textarea{font:inherit}button,a{-webkit-tap-highlight-color:transparent}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.45}button{color:inherit}button:focus-visible,a:focus-visible{outline:3px solid #bd9d52;outline-offset:4px}a{color:var(--green)}h1,h2,h3,p{margin:0}button svg,a svg{flex-shrink:0}img{max-width:100%;object-fit:contain}button{border:0}::selection{background:#d7e4cf}
+.app-shell{min-height:100vh}.side-rail{position:fixed;inset:0 auto 0 0;width:78px;z-index:20;background:var(--deep);color:#d9e2d7;display:flex;align-items:center;flex-direction:column;padding:27px 10px 21px}.brand-mark{width:45px;height:45px;border:1px solid #758473;border-radius:50%;color:#ebdfbb;display:grid;place-items:center;text-decoration:none}.rail-links{display:flex;flex-direction:column;gap:15px;margin-top:56px;width:100%}.rail-links button{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:transparent;color:#a6b7a7;border-radius:12px;min-height:65px;padding:10px 3px;transition:background .2s,color .2s}.rail-links button span{font-size:10px;letter-spacing:.15px}.rail-links button.active{background:#3b5744;color:#fcf9ed}.rail-links button:not(:disabled):hover{background:#37523f;color:white}.rail-links button:disabled{opacity:.38}.rail-help{margin-top:auto;background:transparent;color:#becdbd;display:grid;place-items:center;width:40px;height:40px;border-radius:50%}.rail-help:hover{background:#3b5744}.rail-version{font-size:9px;letter-spacing:1.8px;color:#99ab98;margin-top:16px}.app-content{margin-left:78px}.topbar{height:84px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 34px;gap:24px;background:var(--white)}.wordmark{font-family:Georgia,'Times New Roman',serif;font-size:31px;font-weight:700;letter-spacing:-1.3px;line-height:1}.wordmark span{display:block;font-family:Arial,sans-serif;font-size:8px;letter-spacing:3.3px;font-weight:500;margin-top:7px}.topbar-divider{height:27px;width:1px;background:var(--line)}.topbar-caption{font-size:12px;color:var(--muted)}.topbar-actions{margin-left:auto;display:flex;align-items:center;gap:24px}.prototype-badge{font-size:9px;font-weight:700;letter-spacing:1.7px;border:1px solid #d8dccd;padding:7px 9px;border-radius:5px;color:#747e66}.save-indicator{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);background:none}.save-indicator svg{margin-left:4px}.status-dot{display:inline-block;flex:none;background:#76976b;width:6px;height:6px;border-radius:50%}.status-dot.neutral{background:#b1ad95}.status-dot.warning{background:#c28b4c}
+.main-content{max-width:1680px;margin:auto;padding:31px 34px 15px}.page-heading{display:flex;justify-content:space-between;align-items:center;gap:22px;margin-bottom:27px}.eyebrow{display:flex;align-items:center;gap:7px;font-size:9px;font-weight:600;letter-spacing:1.7px;color:#899079}.eyebrow>span{width:5px;height:5px;border-radius:50%;background:var(--gold)}h1{font-family:Georgia,'Times New Roman',serif;font-size:clamp(25px,2.5vw,39px);letter-spacing:-1.2px;font-weight:400;line-height:1.18;margin:11px 0 9px}.page-heading>div>p{font-size:12px;line-height:1.7;color:var(--muted)}.heading-stats{display:flex;gap:23px;align-items:center;flex-shrink:0}.time-stat,.wallet-stat{display:flex;gap:10px;align-items:center;background:none;text-align:left}.wallet-stat{padding-left:22px;border-left:1px solid #dedfd4}.stat-icon{width:38px;height:38px;background:#ececdf;border:1px solid #e0e4d5;border-radius:11px;display:grid;place-items:center;color:#8f966c}.time-stat small,.wallet-stat small{display:block;font-size:10px;color:var(--muted);margin-bottom:7px}.time-stat strong,.wallet-stat strong{font-weight:600;letter-spacing:.2px;font-size:15px}.time-stat em{font-size:10px;font-weight:400;font-style:normal;color:#9b9e91;margin-left:3px}
+.journey-layout{display:grid;grid-template-columns:minmax(0,1fr) 306px;gap:22px}.map-card{border:1px solid #dee3d7;overflow:hidden;background:#e8e9de;border-radius:17px;min-width:0;box-shadow:0 3px 9px #34452b04}.map-toolbar{height:58px;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:0 19px;background:var(--white);border-bottom:1px solid var(--line)}.map-title{display:flex;align-items:center;gap:9px}.map-title>svg{color:#708265}.map-title h2{font-size:12px;font-weight:600;white-space:nowrap}.map-country{font-size:8px;letter-spacing:1px;padding-left:11px;border-left:1px solid var(--line);color:#969b8c;margin-left:4px}.map-tools{display:flex;align-items:center;gap:9px}.map-tools button{height:30px;display:flex;align-items:center;justify-content:center;gap:5px;background:#f6f7f1;border:1px solid #e5e8dc;border-radius:6px;font-size:10px;padding:0 8px;color:#65735c}.map-tools button:hover{background:#e9eedf}.map-stage{position:relative;height:clamp(380px,48vh,530px);isolation:isolate}.map-shell,.map-canvas{position:absolute;inset:0}.map-shell{background:#e7eade}.map-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;color:#6e7c63;background:#edf0e5;font-size:12px;z-index:2}.spinner{width:15px;height:15px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;animation:spin .8s linear infinite;flex-shrink:0}@keyframes spin{to{transform:rotate(360deg)}}.map-caption{position:absolute;z-index:2;top:16px;left:17px;display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fffef7f2;box-shadow:0 2px 8px #203b2520;border-radius:7px;color:#66715b;font-size:10px;pointer-events:none}.map-legend{position:absolute;z-index:2;top:61px;left:17px;display:flex;gap:13px;align-items:center;background:#fffef7e8;padding:7px 10px;border-radius:6px;pointer-events:none;max-width:calc(100% - 34px)}.map-legend>span{font-size:9px;display:flex;align-items:center;gap:5px;color:#707963;white-space:nowrap}.legend-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#526f48}.map-legend img{width:18px;height:18px}.map-journey-card{position:absolute;z-index:2;left:17px;right:58px;bottom:31px;background:#fffef9f7;border:1px solid #e2e6d6;box-shadow:0 5px 25px #2f483422;border-radius:12px;padding:17px;display:flex;align-items:center;gap:12px;pointer-events:none}.destination-icon{width:44px;height:44px;border-radius:11px;background:#e9efdf;display:grid;place-items:center;color:#748464;flex-shrink:0}.map-journey-card>div{min-width:0}.map-journey-card .eyebrow{font-size:8px;letter-spacing:1.2px}.map-journey-card strong{display:block;font-family:Georgia,serif;font-size:20px;font-weight:400;margin:6px 0}.map-journey-card small{display:block;font-size:10px;color:#919683;line-height:1.3}.map-location-number{font-family:Georgia,serif;font-size:25px;color:#59734d;margin-left:auto;flex-shrink:0;text-align:right}.map-location-number small{font-family:Arial,sans-serif;font-size:9px;letter-spacing:1.3px;margin-top:4px;color:#a4a992}.map-network-note{position:absolute;z-index:4;left:16px;right:16px;top:104px;max-width:460px;padding:12px 14px;background:#fff7e9;color:#846f44;border:1px solid #ead9b9;border-radius:8px;font-size:11px;line-height:1.6}.map-network-note button{background:none;font-size:11px;text-decoration:underline;margin-left:4px;color:#6b5c3b}.maplibregl-ctrl-group{box-shadow:0 2px 8px #354a2622!important;border:1px solid #d8deca!important;border-radius:8px!important}.maplibregl-ctrl-bottom-right .maplibregl-ctrl-group{margin-bottom:40px}.maplibregl-ctrl-attrib{font-size:10px!important;background:#fffef5e8!important}.maplibregl-ctrl-attrib a{color:#5e7151}.maplibregl-canvas:focus-visible{outline:3px solid #b99c61;outline-offset:-3px}
+.place-pin{width:59px;height:68px;position:relative;background:none;padding:0;border:0;cursor:pointer;border-radius:9px}.place-pin img{position:absolute;bottom:9px;left:0;width:59px;height:56px;filter:drop-shadow(0 4px 3px #243a293b);transition:filter .2s}.place-pin span{position:absolute;bottom:0;left:21px;width:19px;height:19px;border:2px solid white;box-shadow:0 2px 4px #334e3026;border-radius:50%;background:#5c7855;color:white;font-family:Arial,sans-serif;font-size:8px;line-height:15px;text-align:center}.place-pin.is-selected img{filter:drop-shadow(0 0 3px #faf5a7) drop-shadow(0 5px 5px #1e342566)}.place-pin.is-selected span{background:#ae9058}.place-pin:hover img{filter:drop-shadow(0 3px 5px #47613c99)}.vespa-pin{width:59px;height:59px;border-radius:50%;background:#fffaf0c9;border:2px solid #fffdf3;box-shadow:0 0 0 6px #769b6452,0 3px 14px #314c3433}.vespa-pin img{width:59px;height:59px;filter:drop-shadow(0 3px 2px #30452a33)}
+.planner-card{border:1px solid var(--line);background:var(--white);border-radius:17px;display:flex;flex-direction:column;overflow:hidden}.planner-heading{padding:25px 24px 0}.section-kicker{font-size:8px;letter-spacing:1.7px;color:#a3a28b}.planner-heading h2{font-family:Georgia,serif;font-size:23px;font-weight:400;letter-spacing:-.7px;margin-top:9px;line-height:1.2}.planner-heading p{font-size:10px;color:var(--muted);margin-top:9px;line-height:1.6}.welcome-illustration{height:155px;position:relative;display:grid;place-items:center;margin:4px 20px 12px;isolation:isolate}.welcome-illustration img{width:164px;height:142px;position:relative;transform:rotate(-6deg);filter:drop-shadow(0 12px 8px #57604422)}.illustration-halo{position:absolute;width:137px;height:137px;background:#edf0e3;border-radius:50%;top:10px;z-index:-1}.illustration-label{position:absolute;bottom:0;right:7px;font-size:7px;letter-spacing:1px;color:#929779;transform:rotate(-7deg)}.onboarding-steps{padding:0 24px;display:flex;flex-direction:column;gap:19px}.setup-step{display:flex;align-items:center;gap:12px;position:relative}.setup-step:not(:last-child):after{content:"";position:absolute;left:14px;top:31px;width:1px;height:19px;background:#e7e9df}.setup-step>span{display:grid;place-items:center;flex:none;width:29px;height:29px;border-radius:50%;border:1px solid #e2e6d9;color:#9b9f90;font-size:9px;background:#fcfcf6}.setup-step strong{font-size:11px;font-weight:500;display:block}.setup-step small{display:block;font-size:9px;color:#9b9f92;margin-top:5px;line-height:1.5}.setup-step.current>span{background:#eef2e5;border-color:#d9e3cb;color:#627550}.setup-step.current strong{font-weight:600;color:#4c6841}.setup-step.done>span{background:#577447;color:white}.setup-step.upcoming strong{color:#949889}.departure-panel{margin-top:auto;padding:22px 23px 18px}.button{display:inline-flex;justify-content:center;align-items:center;gap:9px;padding:12px 16px;border:1px solid transparent;border-radius:8px;text-decoration:none;font-size:12px;line-height:1.4;font-weight:500;min-height:43px;transition:background .2s,box-shadow .2s}.button.primary{background:var(--green);color:white;border-color:var(--green)}.button.primary:hover:not(:disabled){background:#33563d;box-shadow:0 3px 9px #23443122}.button.secondary{background:#fbfbf5;border-color:#dde3d3;color:#617353}.button.secondary:hover:not(:disabled){background:#edf1e5}.departure-button{width:100%;min-height:45px;gap:8px;font-size:11px;white-space:nowrap}.departure-button>svg:last-child{margin-left:auto}.departure-note{margin-top:12px;font-size:8px;color:#a0a18e;display:flex;align-items:center;justify-content:center;gap:5px;line-height:1.5}
+.dashboard-cards{display:grid;grid-template-columns:1.35fr 1.05fr .85fr;gap:20px;margin-top:22px}.summary-card{padding:19px 21px 17px;background:var(--white);border:1px solid var(--line);border-radius:13px;min-width:0;min-height:155px}.card-title{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-bottom:19px}.card-title h2{font-size:11px;font-weight:600;display:flex;align-items:center;gap:7px;white-space:nowrap}.card-title h2 svg{color:#879776}.text-button{padding:0;background:none;color:#7d8e65;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:10px}.text-button:hover:not(:disabled){color:var(--deep)}.mini-badge{font-size:7px;color:#a0a48f;letter-spacing:.9px;white-space:nowrap}.party-pair{display:grid;grid-template-columns:1fr 1fr;gap:18px}.party-person{display:flex;align-items:center;gap:10px;min-width:0}.avatar{height:55px;width:48px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;padding:0;overflow:hidden;border:1px solid #e4e7da}.avatar img{height:69px;width:57px;max-width:none;object-fit:cover;object-position:top;transform:translateY(7px)}.empty-avatar{border:1px dashed #cbd1bf;background:#f6f7ef;color:#9eac8c}.party-person>div{min-width:0}.party-person small{font-size:7px;color:#a4a992;letter-spacing:1px;display:block}.party-person strong{font-size:11px;font-weight:500;display:block;margin-top:6px;line-height:1.4}.person-state{font-size:8px;color:#99a088;display:flex;align-items:center;gap:4px;margin-top:7px;line-height:1.4}.person-state .status-dot{width:4px;height:4px}.vespa-overview{display:flex;align-items:center;gap:16px;margin-top:-3px}.vespa-art{width:79px;height:70px;filter:drop-shadow(0 5px 3px #3e5a2c22);flex-shrink:0}.vespa-overview>div{flex:1;min-width:0}.meter>div{display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:9px;color:#8a927d;margin-bottom:8px}.meter strong{font-size:9px;font-weight:500;color:#637657}.meter progress{display:block;height:5px;border-radius:4px;width:100%;overflow:hidden;appearance:none;border:none;background:#edf0e4}.meter progress::-webkit-progress-bar{background:#edf0e4;border-radius:4px}.meter progress::-webkit-progress-value{background:#8a9d71;border-radius:4px}.meter progress::-moz-progress-bar{background:#8a9d71;border-radius:4px}.vehicle-condition{display:flex;align-items:center;gap:5px;font-size:8px;color:#919a80;margin-top:10px}.vehicle-condition i{width:4px;height:4px}.visit-count{display:flex;align-items:center;gap:13px;margin-top:-6px}.visit-count>strong{font-family:Georgia,serif;font-weight:400;font-size:31px;color:#647e51}.visit-count p{font-size:9px;line-height:1.65;color:#949b87}.visit-dots{display:flex;gap:7px;margin-top:12px}.visit-dots button{display:grid;place-items:center;width:19px;height:19px;font-size:8px;border-radius:50%;background:#f1f3e9;color:#98a189;border:1px solid #e4e8d9;padding:0}.visit-dots button.selected,.visit-dots button:hover{background:#7a8f63;border-color:#7a8f63;color:white}.page-footer{display:flex;align-items:center;justify-content:space-between;margin-top:24px;padding:0 2px;font-size:9px;color:#a2a691}.page-footer>span{display:flex;gap:6px;align-items:center}.page-footer>button{display:flex;gap:6px;align-items:center;font-size:9px;color:#9b9f8a;background:none}
+.modal{border:1px solid #dfe5d5;background:var(--white);color:var(--ink);padding:30px;border-radius:19px;width:min(550px,calc(100vw - 32px));max-height:calc(100dvh - 44px);overflow:auto;box-shadow:0 24px 100px #20352a55}.modal::backdrop{background:#182e2588;backdrop-filter:blur(4px)}.modal-wide{width:min(970px,calc(100vw - 40px))}.modal-top{display:flex;align-items:flex-start;justify-content:space-between;gap:17px;margin-bottom:26px}.modal-top h2{font-family:Georgia,serif;font-size:28px;font-weight:400;letter-spacing:-.7px;line-height:1.25}.modal-top p{color:var(--muted);font-size:12px;line-height:1.7;margin-top:9px}.icon-button{width:31px;height:31px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid #e4e7d9;border-radius:8px;background:#f6f7ef;color:#7b876b}.icon-button:hover{background:#e8efdf}.party-guide{display:flex;align-items:center;gap:10px;font-size:10px;margin-bottom:22px;color:#8a977c;background:#f2f4eb;border:1px solid #e5e9d9;border-radius:8px;padding:13px 15px}.party-guide strong{margin-left:auto;font-size:10px;font-weight:500;color:#607b4f}.character-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:13px}.character-option{background:none;border:1px solid #e1e5d8;border-radius:12px;padding:7px 7px 13px;text-align:left;transition:border-color .2s,box-shadow .2s,opacity .2s;min-width:0}.character-option:not(:disabled):hover{border-color:#8b9f78;box-shadow:0 3px 12px #36502a12}.character-option.selected{border:2px solid #65874f;padding:6px 6px 12px;background:#f6f9ef;box-shadow:0 0 0 2px #b5c99c35}.character-option:disabled{opacity:.43}.character-art{position:relative;height:205px;display:grid;place-items:center;overflow:hidden;border-radius:7px}.character-art img{height:96%;width:100%;padding:9px 0 0;object-fit:contain;filter:drop-shadow(0 6px 4px #29452414)}.character-order{position:absolute;top:7px;right:7px;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;font-size:11px;background:#fffef1ce;border:1px solid #fffef7;color:#7b8c69}.selected .character-order{background:#64804e;color:white;border-color:#64804e}.character-option>strong{font-size:11px;display:block;margin:13px 3px 6px;font-weight:600;line-height:1.35}.character-option>span{font-size:9px;display:block;color:#8b967e;margin:0 3px;line-height:1.4}.selected>span{color:#64814d}.muted{color:var(--muted);line-height:1.7}.small{font-size:11px}.character-grid+.muted{margin:18px 0 5px}.modal-actions{display:flex;align-items:center;justify-content:flex-end;gap:11px;margin-top:25px;padding-top:21px;border-top:1px solid var(--line)}.wrap-actions{flex-wrap:wrap}.full-width{width:100%;margin-top:16px}.notice{display:flex;gap:10px;align-items:flex-start;background:#eef2e5;border:1px solid #dfe6d2;padding:14px;border-radius:9px;color:#778766;font-size:11px;line-height:1.8;margin:18px 0}.help-steps{padding-left:25px;margin:0}.help-steps li{padding-left:7px;margin-bottom:20px;font-size:12px;color:#688057}.help-steps strong{font-weight:600;color:var(--ink)}.help-steps p{color:var(--muted);line-height:1.8;margin-top:7px;font-size:11px}.toast{position:fixed;z-index:100;bottom:26px;left:calc(50% + 39px);transform:translateX(-50%);display:flex;align-items:center;gap:12px;width:max-content;max-width:calc(100vw - 130px);padding:16px 18px;background:#2e4d3c;color:#f3f6eb;border:1px solid #55745b;border-radius:12px;box-shadow:0 7px 30px #18302233;font-size:12px;line-height:1.7}.toast>button{background:none;display:grid;place-items:center;color:#c3d0b8;margin-left:8px;padding:4px}
+@media(min-width:1600px){.journey-layout{grid-template-columns:minmax(0,1fr) 340px}.planner-heading{padding:28px 28px 0}.planner-heading h2{font-size:26px}.welcome-illustration{height:185px}.welcome-illustration img{width:185px;height:165px}.illustration-halo{width:165px;height:165px}.onboarding-steps{padding:0 28px;gap:23px}.setup-step strong{font-size:12px}.setup-step small{font-size:10px}.departure-panel{padding:24px 27px}.summary-card{padding:22px 24px}.card-title h2{font-size:12px}.party-person strong{font-size:12px}}
+@media(max-width:1200px){.main-content{padding:26px 24px 15px}.topbar{padding:0 24px;gap:18px}.topbar-actions{gap:15px}.page-heading{gap:17px}.heading-stats{gap:15px}.wallet-stat{padding-left:15px}.time-stat strong,.wallet-stat strong{font-size:13px}.stat-icon{width:33px;height:33px}.journey-layout{grid-template-columns:minmax(0,1fr) 290px;gap:16px}.dashboard-cards{gap:14px;grid-template-columns:1.4fr 1.05fr .9fr}.summary-card{padding:17px 15px}.party-pair{gap:10px}.party-person{gap:7px}.avatar{width:39px;height:50px}.party-person strong{font-size:10px}.party-person small{font-size:6px}.card-title h2{font-size:10px;gap:5px}.card-title h2 svg{width:15px}.mini-badge{font-size:6px}.vespa-art{width:60px;height:65px}.vespa-overview{gap:9px}.visit-dots{gap:4px}.visit-dots button{width:17px;height:17px;font-size:7px}.map-country{display:none}.heading-stats .time-stat em{display:none}}
+@media(max-width:1000px){.topbar-caption,.topbar-divider{display:none}.page-heading{align-items:flex-start}.heading-stats{gap:11px}.time-stat{display:none}.wallet-stat{border:0;padding:0}.wallet-stat small{font-size:9px}.stat-icon{width:31px;height:31px}.journey-layout{grid-template-columns:minmax(0,1fr) 260px}.planner-heading{padding:23px 20px 0}.planner-heading h2{font-size:21px}.planner-heading p{font-size:9px}.onboarding-steps{padding:0 20px}.setup-step strong{font-size:10px}.setup-step small{font-size:8px}.departure-panel{padding:21px 18px 17px}.welcome-illustration{height:146px}.departure-button{font-size:10px}.map-toolbar{padding:0 13px}.map-tools button span{display:none}.map-title h2{font-size:11px}.dashboard-cards{grid-template-columns:1.15fr 1fr}.journal-summary{grid-column:1/-1;display:flex;align-items:center;gap:30px;min-height:84px}.journal-summary .card-title{margin:0;min-width:160px}.journal-summary .visit-count{margin:0}.journal-summary .visit-count>strong{font-size:26px}.journal-summary .visit-dots{margin:0 0 0 auto}.character-art{height:170px}.character-option>strong{font-size:10px}.map-journey-card strong{font-size:18px}.map-journey-card{padding:14px;gap:9px}.destination-icon{width:38px;height:38px}.map-location-number{font-size:21px}}
+@media(max-width:780px){.side-rail{width:64px;padding:25px 7px 18px}.brand-mark{width:40px;height:40px}.rail-links{margin-top:40px}.rail-links button{min-height:59px}.app-content{margin-left:64px}.topbar{height:75px;padding:0 20px}.main-content{padding:25px 20px 15px}.page-heading{margin-bottom:23px}.page-heading h1{font-size:29px;max-width:390px}.page-heading>div>p{font-size:11px}.wallet-stat{display:none}.journey-layout{grid-template-columns:minmax(0,1fr)}.map-stage{height:400px}.map-country{display:inline}.map-tools button span{display:inline}.planner-card{display:grid;grid-template-columns:1fr 1fr;position:relative}.planner-heading{padding:24px 23px 0;grid-column:1;grid-row:1}.planner-heading h2{font-size:24px}.planner-heading p{font-size:11px}.welcome-illustration{grid-column:1;grid-row:2/4;min-height:160px;margin:0}.welcome-illustration img{width:155px}.onboarding-steps{grid-column:2;grid-row:1/3;padding:24px 23px 0;gap:18px}.setup-step strong{font-size:10px}.setup-step small{font-size:9px}.departure-panel{grid-column:2;grid-row:3;padding:21px 23px 24px}.departure-button{font-size:10px}.dashboard-cards{grid-template-columns:1fr 1fr}.party-summary{grid-column:1/-1}.party-pair{gap:25px}.party-person{gap:13px}.party-person strong{font-size:12px}.party-person small{font-size:8px}.avatar{width:50px;height:55px}.person-state{font-size:9px}.card-title h2{font-size:12px}.card-title h2 svg{width:17px}.journal-summary{grid-column:auto;display:block;min-height:155px}.journal-summary .card-title{min-width:0;margin-bottom:19px}.journal-summary .visit-dots{margin-top:12px;gap:5px}.journal-summary .visit-count{margin-top:-6px}.journal-summary .visit-count>strong{font-size:31px}.mini-badge{font-size:7px}.journal-summary .mini-badge{display:none}.character-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.character-art{height:195px}.character-option>strong{font-size:11px}.toast{left:calc(50% + 32px);max-width:calc(100vw - 100px)}.save-indicator{font-size:10px}.topbar-actions{gap:15px}.page-footer{font-size:8px}.page-footer>button{font-size:8px}.page-footer>span{max-width:70%;line-height:1.6}}
+@media(max-width:520px){.side-rail{inset:auto 0 0;width:100%;height:65px;padding:0 13px;flex-direction:row;z-index:30;border-top:1px solid #516047;box-shadow:0 -3px 18px #1d332111}.brand-mark,.rail-version{display:none}.rail-links{margin:0;flex-direction:row;gap:4px;justify-content:space-between}.rail-links button{width:60px;min-height:54px;padding:7px 3px;gap:5px;border-radius:9px}.rail-links button span{font-size:8px}.rail-links button svg{width:20px;height:20px}.rail-help{margin:0 0 0 7px;flex-shrink:0;width:35px}.app-content{margin-left:0;padding-bottom:65px}.topbar{height:70px;padding:0 19px;gap:10px}.wordmark{font-size:28px}.wordmark span{font-size:7px;letter-spacing:3px;margin-top:6px}.topbar-actions{gap:10px}.prototype-badge{font-size:7px;letter-spacing:1px;padding:6px}.save-indicator{gap:5px;font-size:8px;max-width:115px;line-height:1.5}.save-indicator>svg{display:none}.main-content{padding:26px 15px 15px}.page-heading{margin-bottom:22px}.eyebrow{font-size:8px;letter-spacing:1.5px}h1{font-size:30px!important;letter-spacing:-.9px;max-width:320px;line-height:1.13;margin:13px 0 10px}.page-heading>div>p{font-size:11px;line-height:1.8;max-width:315px}.heading-stats{display:none}.map-stage{height:375px}.map-toolbar{height:52px;padding:0 12px;gap:8px}.map-country{display:none}.map-tools{gap:6px}.map-tools button{padding:0 6px;font-size:9px}.map-tools button svg{width:15px;height:15px}.map-title{gap:7px}.map-title h2{font-size:11px}.map-caption{font-size:9px;padding:9px 10px;left:12px;top:13px}.map-legend{left:12px;top:55px;gap:10px;font-size:8px}.map-legend>span{font-size:8px}.map-journey-card{left:12px;right:47px;bottom:31px;padding:13px 11px;gap:9px;border-radius:10px}.map-journey-card strong{font-size:17px;line-height:1.15;margin:6px 0}.map-journey-card .eyebrow{font-size:6px;letter-spacing:1px}.map-journey-card small{font-size:8px}.destination-icon{width:34px;height:34px;border-radius:8px}.destination-icon svg{width:20px}.map-location-number{font-size:19px}.map-network-note{font-size:10px;left:12px;right:12px;top:96px}.planner-card{grid-template-columns:1fr 115px}.planner-heading{padding:23px 20px 0;grid-column:1;grid-row:1}.planner-heading h2{font-size:23px}.planner-heading p{font-size:10px}.welcome-illustration{grid-column:2;grid-row:1/3;margin:15px 5px 0 0;min-height:115px;height:115px;align-self:start}.welcome-illustration img{width:112px;height:112px}.illustration-halo{width:98px;height:98px}.illustration-label{display:none}.onboarding-steps{grid-column:1/-1;grid-row:3;padding:24px 20px 0;gap:17px}.setup-step strong{font-size:11px}.setup-step small{font-size:9px}.departure-panel{grid-column:1/-1;grid-row:4;padding:23px 20px 21px}.departure-button{font-size:12px;min-height:46px}.departure-note{font-size:9px;margin-top:13px}.dashboard-cards{grid-template-columns:minmax(0,1fr);gap:13px;margin-top:16px}.summary-card{padding:19px 20px;min-height:144px}.card-title h2{font-size:12px}.card-title{margin-bottom:22px}.party-pair{gap:12px}.party-person{gap:9px}.party-person strong{font-size:11px}.party-person small{font-size:7px}.person-state{font-size:8px}.avatar{width:43px;height:53px}.journal-summary{grid-column:auto;min-height:155px}.journal-summary .visit-dots{gap:10px;margin-top:14px}.visit-dots button{width:21px;height:21px;font-size:8px}.mini-badge{font-size:7px}.journal-summary .mini-badge{display:inline}.vespa-art{width:93px;height:77px}.vespa-overview{gap:21px}.meter>div,.meter strong{font-size:10px}.vehicle-condition{font-size:9px}.page-footer{margin:22px 2px 7px;align-items:flex-start;gap:10px}.page-footer>span{font-size:8px;max-width:65%}.page-footer>button{font-size:8px;line-height:1.6}.modal,.modal-wide{width:calc(100vw - 22px);padding:22px 17px;max-height:calc(100dvh - 28px);border-radius:15px}.modal-top{gap:10px;margin-bottom:22px}.modal-top h2{font-size:25px}.modal-top p{font-size:11px}.party-guide{padding:11px 10px;gap:6px;font-size:9px}.party-guide strong{font-size:9px}.party-guide>svg{width:11px}.character-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.character-art{height:181px}.character-option>strong{font-size:11px}.character-option>span{font-size:9px}.modal-actions{gap:8px;justify-content:stretch;margin-top:22px;padding-top:18px}.modal-actions .button{flex:1;font-size:10px;padding:12px 8px;gap:6px;white-space:nowrap}.toast{left:50%;bottom:82px;max-width:calc(100vw - 26px);font-size:11px;padding:13px 14px;width:calc(100vw - 26px);gap:9px}.toast>button{margin-left:auto}}
+/* Readability refinements for the first playable screen. */
+.section-kicker,.eyebrow{color:#69765d}.planner-heading p,.page-heading>div>p{color:#697163}.setup-step small{color:#737d68}.setup-step.upcoming strong{color:#79846f}.departure-note{color:#717e64;font-size:10px}.person-state{color:#718164}.party-person small{color:#768469}.card-title h2{font-size:12px}.mini-badge{color:#748267}.page-footer{color:#76816c}.page-footer>button{color:#6c795f}.character-option>span{color:#68775b}.character-option:disabled{opacity:.6}.character-art{background-image:radial-gradient(ellipse at 50% 85%,#fff9 0%,transparent 65%)}.map-journey-card small{color:#707d62}.map-caption{font-size:11px}.page-heading h1{color:#264a35}.welcome-illustration img{filter:drop-shadow(0 12px 8px #57604430)}
+@media(max-width:520px){.map-caption{font-size:9px}.departure-note{font-size:9px}.card-title h2{font-size:12px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;animation-iteration-count:1!important}}
+</file>
+
+<file path="app/layout.js">
+import "maplibre-gl/dist/maplibre-gl.css";
+import "./globals.css";
+
+export const metadata = { title: "Ziarah Walisongo | Perjalanan Vespa", description: "Pilih teman perjalanan, jelajahi peta Indonesia, dan temukan cerita di setiap persinggahan." };
+
+export default function RootLayout({ children }) { return <html lang="id"><body>{children}</body></html>; }
+</file>
+
+<file path="app/page.js">
+import Game from "@/components/Game";
+
+export default function Page() { return <Game />; }
+</file>
+
+<file path="components/WorldMap.js">
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import * as maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { ASSET, PLACE_TYPES } from "@/lib/catalog.mjs";
+
+// Tetapkan lokasi worker sebelum membuat instance peta.
+maplibregl.setWorkerUrl(
+  new URL(
+    "maplibre-gl/dist/maplibre-gl-worker.mjs",
+    import.meta.url
+  ).toString()
+);
+
+const STYLE={version:8,sources:{osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'}},layers:[{id:"base",type:"raster",source:"osm",paint:{"raster-saturation":-0.45,"raster-contrast":-0.1}}]};
+export default function WorldMap({locations,position,route,selectedId,onSelect,onPick,placing,apiRef,moving,visits,focusRequest}){
+ const container=useRef(null),mapRef=useRef(null),markers=useRef([]),vehicle=useRef(null),handlers=useRef({onSelect,onPick,placing});
+ const [ready,setReady]=useState(false),[error,setError]=useState(false),[attempt,setAttempt]=useState(0);
+ handlers.current={onSelect,onPick,placing};
+ useEffect(()=>{
+  let alive=true,loaded=false;
+  let map;
+  try { map=new maplibregl.Map({container:container.current,style:STYLE,center:[111.05,-7.05],zoom:6.6,minZoom:3,maxZoom:18,maxBounds:[[93,-12],[143,7]],attributionControl:false}); }
+  catch { setError(true); return; }
+  mapRef.current=map;
+  map.addControl(new maplibregl.NavigationControl({showCompass:false}),"bottom-right");
+  map.addControl(new maplibregl.AttributionControl({compact:false}),"bottom-right");
+  const observer=new ResizeObserver(()=>map.resize());observer.observe(container.current);
+  map.on("load",()=>{
+   if(!alive)return;loaded=true;setReady(true);
+   map.addSource("journey",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+   map.addLayer({id:"journey-halo",type:"line",source:"journey",layout:{"line-join":"round","line-cap":"round"},paint:{"line-color":"#fff","line-width":9,"line-opacity":0.9}});
+   map.addLayer({id:"journey-line",type:"line",source:"journey",layout:{"line-join":"round","line-cap":"round"},paint:{"line-color":"#52734e","line-width":4}});
+   apiRef.current={
+    focus:(coordinates,zoom=12)=>map.flyTo({center:coordinates,zoom,duration:1100}),
+    indonesia:()=>map.fitBounds([[94.7,-11],[141,6]],{padding:45,duration:1100}),
+    fitRoute:(coordinates)=>{const bounds=new maplibregl.LngLatBounds();coordinates.forEach(p=>bounds.extend(p));map.fitBounds(bounds,{padding:{top:90,bottom:140,left:75,right:75},maxZoom:12,duration:900});}
+   };
+  });
+  map.on("error",()=>{if(alive)setError(true);});
+  map.on("click",e=>{if(handlers.current.placing)handlers.current.onPick([Number(e.lngLat.lng.toFixed(6)),Number(e.lngLat.lat.toFixed(6))]);});
+  const timer=setTimeout(()=>{if(alive&&!loaded)setError(true);},12000);
+  return ()=>{alive=false;clearTimeout(timer);observer.disconnect();markers.current.forEach(m=>m.remove());markers.current=[];vehicle.current=null;map.remove();mapRef.current=null;apiRef.current=null;setReady(false);};
+ },[attempt,apiRef]);
+ useEffect(()=>{
+  if(!ready||!mapRef.current)return;
+  markers.current.forEach(m=>m.remove());
+  const visited=new Set(visits.map(v=>v.locationId));
+  markers.current=locations.map((p,i)=>{
+   const type=PLACE_TYPES[p.type],el=document.createElement("button");
+   el.type="button";el.className="place-pin"+(selectedId===p.id?" is-selected":"")+(visited.has(p.id)?" is-visited":"");
+   el.setAttribute("aria-label","Buka detail "+p.name);el.title=p.name;
+   const img=document.createElement("img");img.src=ASSET+"/buildings/"+type.image;img.alt="";img.draggable=false;el.append(img);
+   const badge=document.createElement("span");badge.textContent=visited.has(p.id)?"✓":p.custom?"+":String(i+1).padStart(2,"0");el.append(badge);
+   el.addEventListener("click",e=>{if(handlers.current.placing)return;e.stopPropagation();handlers.current.onSelect(p.id);});
+   return new maplibregl.Marker({element:el,anchor:"bottom"}).setLngLat(p.coordinates).addTo(mapRef.current);
+  });
+ },[ready,locations,selectedId,visits]);
+ useEffect(()=>{
+  if(!ready||!mapRef.current)return;
+  mapRef.current.getSource("journey")?.setData(route?.coordinates?.length>=2?{type:"Feature",properties:{},geometry:{type:"LineString",coordinates:route.coordinates}}:{type:"FeatureCollection",features:[]});
+  if(route?.coordinates)apiRef.current?.fitRoute(route.coordinates);
+ },[ready,route,apiRef]);
+ useEffect(()=>{
+  if(!ready||!mapRef.current)return;
+  if(!vehicle.current){const el=document.createElement("div");el.className="vespa-pin";el.setAttribute("role","img");el.setAttribute("aria-label","Posisi Vespa");const img=document.createElement("img");img.src=ASSET+"/items/vespa.png";img.alt="";el.append(img);vehicle.current=new maplibregl.Marker({element:el,anchor:"center"}).setLngLat(position).addTo(mapRef.current);}
+  vehicle.current.setLngLat(position);vehicle.current.getElement().classList.toggle("is-moving",moving);
+ },[ready,position,moving]);
+ useEffect(()=>{if(focusRequest&&ready)apiRef.current?.focus(focusRequest.coordinates,focusRequest.zoom||12);},[focusRequest,ready,apiRef]);
+ useEffect(()=>{if(container.current)container.current.style.cursor=placing?"crosshair":"";},[placing]);
+ return <div className="map-shell"><div ref={container} className="map-canvas" aria-label="Peta perjalanan Indonesia"/>
+  {!ready&&!error&&<div className="map-loading"><span className="spinner"/><span>Menyiapkan peta Indonesia…</span></div>}
+  {error&&<div className="map-network-note" role="status">Peta belum dapat ditampilkan sepenuhnya. Periksa koneksi internet dan dukungan WebGL browser. Pemilihan karakter tetap dapat digunakan. <button onClick={()=>{setError(false);setAttempt(x=>x+1);}}>Muat ulang peta</button></div>}
+ </div>;
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "ziarah-walisongo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "maplibre-gl": "6.15.0",
+    "next": "16.4.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.3",
+    "tailwindcss": "^4"
+  }
+}
+</file>
+
+</files>

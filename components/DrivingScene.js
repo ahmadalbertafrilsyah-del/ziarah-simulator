@@ -135,7 +135,7 @@ export default function DrivingScene({ party, onExit }) {
 
   const [camera, setCamera] = useState("behind");
   const [panel, setPanel] = useState(null);
-  const [stats, setStats] = useState(() => snapshot(ride.current));
+  const [stats, setStats] = useState(() => snapshot(newRide()));
 
   const [error, setError] = useState("");
   const [placeId, setPlaceId] = useState(null);
@@ -259,8 +259,10 @@ export default function DrivingScene({ party, onExit }) {
     try {
       const savedCamera = localStorage.getItem(CAMERA_KEY);
 
-      if (["behind", "top"].includes(savedCamera)) {
+      if (["behind", "front", "left", "right", "top"].includes(savedCamera)) {
         cameraRef.current = savedCamera;
+        // Browser storage is restored once after mount.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCamera(savedCamera);
       }
     } catch {
@@ -273,16 +275,20 @@ export default function DrivingScene({ party, onExit }) {
     try {
       render = createSceneRenderer(element);
     } catch (caughtError) {
+      // Report Canvas initialization failures from the browser effect.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(caughtError.message);
       return;
     }
 
     const oldOverflow = document.body.style.overflow;
+    // Browser layout is synchronized inside this mount effect.
+    // eslint-disable-next-line react-hooks/immutability
     document.body.style.overflow = "hidden";
 
     function resize() {
       const rect = element.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const dpr = Math.min(2.5, Math.max(1.5, window.devicePixelRatio || 1), 3840 / Math.max(1, rect.width), 2160 / Math.max(1, rect.height));
 
       element.width = Math.max(
         1,
@@ -389,6 +395,8 @@ export default function DrivingScene({ party, onExit }) {
     );
 
     let frame;
+    // Frame timing is initialized inside the animation effect.
+    // eslint-disable-next-line react-hooks/purity
     let last = performance.now();
     let lastUi = 0;
     let lastDraw = 0;
@@ -568,21 +576,9 @@ export default function DrivingScene({ party, onExit }) {
           role="group"
           aria-label="Pilih model kamera"
         >
-          <button
-            aria-pressed={camera === "behind"}
-            onClick={() => changeCamera("behind")}
-          >
-            <Icon name="users" size={16} />
-            <span>Belakang</span>
-          </button>
-
-          <button
-            aria-pressed={camera === "top"}
-            onClick={() => changeCamera("top")}
-          >
-            <Icon name="map" size={16} />
-            <span>Atas</span>
-          </button>
+          {[["behind","Belakang"],["front","Depan"],["left","Kiri"],["right","Kanan"],["top","Atas"]].map(([value,label])=>(
+            <button key={value} type="button" aria-pressed={camera===value} onClick={()=>changeCamera(value)}>{label}</button>
+          ))}
         </div>
       </header>
 

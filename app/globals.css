@@ -16,3 +16,26 @@
 .section-kicker,.eyebrow{color:#69765d}.planner-heading p,.page-heading>div>p{color:#697163}.setup-step small{color:#737d68}.setup-step.upcoming strong{color:#79846f}.departure-note{color:#717e64;font-size:10px}.person-state{color:#718164}.party-person small{color:#768469}.card-title h2{font-size:12px}.mini-badge{color:#748267}.page-footer{color:#76816c}.page-footer>button{color:#6c795f}.character-option>span{color:#68775b}.character-option:disabled{opacity:.6}.character-art{background-image:radial-gradient(ellipse at 50% 85%,#fff9 0%,transparent 65%)}.map-journey-card small{color:#707d62}.map-caption{font-size:11px}.page-heading h1{color:#264a35}.welcome-illustration img{filter:drop-shadow(0 12px 8px #57604430)}
 @media(max-width:520px){.map-caption{font-size:9px}.departure-note{font-size:9px}.card-title h2{font-size:12px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;animation-iteration-count:1!important}}
+/* Stage 2: road routing and Vespa journey */
+.journey-panel{padding:18px 0;display:grid;gap:12px;border-bottom:1px solid #e0e6db;margin-bottom:18px}
+.journey-panel label{font-size:12px;font-weight:700;color:#42664e}
+.journey-panel select{width:100%;min-height:44px;border:1px solid #cbd6c5;border-radius:10px;padding:10px;background:#fff;color:#263b2b;font:inherit}
+.journey-panel p{margin:0;line-height:1.6}.journey-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.journey-metrics small,.journey-metrics strong{display:block}.journey-metrics small{font-size:11px;color:#687963}.journey-metrics strong{font-size:20px;margin-top:5px}
+.journey-progress{width:100%;height:9px;accent-color:#52734e}.journey-status{padding:12px;border-radius:10px;background:#edf3e8;color:#355637;font-size:13px;line-height:1.6}
+.journey-error{color:#a13125;background:#fff1ea;padding:12px;border-radius:10px}.departure-panel{display:grid;gap:10px}
+@media(max-width:600px){.journey-panel select,.journey-panel button{font-size:14px}.journey-metrics strong{font-size:18px}}
+/* Keep route controls in a single readable column at every breakpoint. */
+.planner-card{align-self:start;display:flex;flex-direction:column}.journey-panel{margin:0 22px 18px}.journey-panel .button{white-space:normal}.journey-layout{align-items:start}
+@media(max-width:780px){.planner-card{display:flex;flex-direction:column}.planner-heading,.onboarding-steps,.departure-panel{grid-column:auto;grid-row:auto}.welcome-illustration{display:none}.onboarding-steps{padding-top:20px}.journey-panel{margin:0 20px 10px}.departure-panel{margin-top:0}.journey-layout .map-card{position:relative}}
+/* Marker placement belongs to MapLibre. Never use document flow positioning. */
+.map-canvas .maplibregl-marker{position:absolute!important;top:0;left:0}
+.map-canvas .place-pin{width:48px;height:58px}
+.map-canvas .place-pin img{width:var(--place-size,30px);height:var(--place-size,30px);object-fit:contain;left:50%;transform:translateX(-50%);bottom:14px}
+.map-canvas .place-pin span{left:15px;bottom:0}
+.map-canvas[data-detail="far"] .place-pin img{display:none}
+.map-canvas[data-detail="far"] .place-pin{height:20px}
+.map-canvas .vespa-pin{width:32px;height:32px}
+.map-canvas .vespa-pin img{width:30px;height:30px;object-fit:contain}
+.route-controls{display:flex;gap:6px;flex-wrap:wrap}.route-controls button{touch-action:none;user-select:none;flex:1;font-size:11px}
+.journey-panel .travel-services{padding:12px;background:#f0f3e9;border:1px solid #dce3d1;border-radius:12px;margin:0;display:grid;gap:8px}.journey-panel .travel-services small{font-size:10px;color:#66785c;line-height:1.6}.journey-panel .travel-services p{font-size:12px;line-height:1.6}

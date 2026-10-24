@@ -17,13 +17,15 @@ const STYLE={version:8,sources:{osm:{type:"raster",tiles:["https://tile.openstre
 export default function WorldMap({locations,position,route,selectedId,onSelect,onPick,placing,apiRef,moving,visits,focusRequest}){
  const container=useRef(null),mapRef=useRef(null),markers=useRef([]),vehicle=useRef(null),handlers=useRef({onSelect,onPick,placing});
  const [ready,setReady]=useState(false),[error,setError]=useState(false),[attempt,setAttempt]=useState(0);
- handlers.current={onSelect,onPick,placing};
+ useEffect(()=>{handlers.current={onSelect,onPick,placing};},[onSelect,onPick,placing]);
  useEffect(()=>{
   let alive=true,loaded=false;
   let map;
   try { map=new maplibregl.Map({container:container.current,style:STYLE,center:[111.05,-7.05],zoom:6.6,minZoom:3,maxZoom:18,maxBounds:[[93,-12],[143,7]],attributionControl:false}); }
-  catch { setError(true); return; }
+  catch { const failed=setTimeout(()=>setError(true),0); return ()=>clearTimeout(failed); }
   mapRef.current=map;
+  const zoomIcons=()=>{const z=map.getZoom();container.current.dataset.detail=z>=10?"near":"far";container.current.style.setProperty("--place-size",`${Math.max(18,Math.min(48,18+(z-6)*5))}px`);};
+  map.on("zoom",zoomIcons);zoomIcons();
   map.addControl(new maplibregl.NavigationControl({showCompass:false}),"bottom-right");
   map.addControl(new maplibregl.AttributionControl({compact:false}),"bottom-right");
   const observer=new ResizeObserver(()=>map.resize());observer.observe(container.current);
@@ -54,7 +56,7 @@ export default function WorldMap({locations,position,route,selectedId,onSelect,o
    const img=document.createElement("img");img.src=ASSET+"/buildings/"+type.image;img.alt="";img.draggable=false;el.append(img);
    const badge=document.createElement("span");badge.textContent=visited.has(p.id)?"✓":p.custom?"+":String(i+1).padStart(2,"0");el.append(badge);
    el.addEventListener("click",e=>{if(handlers.current.placing)return;e.stopPropagation();handlers.current.onSelect(p.id);});
-   return new maplibregl.Marker({element:el,anchor:"bottom"}).setLngLat(p.coordinates).addTo(mapRef.current);
+   return new maplibregl.Marker({element:el,anchor:"bottom",subpixelPositioning:true}).setLngLat(p.coordinates).addTo(mapRef.current);
   });
  },[ready,locations,selectedId,visits]);
  useEffect(()=>{
@@ -74,4 +76,3 @@ export default function WorldMap({locations,position,route,selectedId,onSelect,o
   {error&&<div className="map-network-note" role="status">Peta belum dapat ditampilkan sepenuhnya. Periksa koneksi internet dan dukungan WebGL browser. Pemilihan karakter tetap dapat digunakan. <button onClick={()=>{setError(false);setAttempt(x=>x+1);}}>Muat ulang peta</button></div>}
  </div>;
 }
-
