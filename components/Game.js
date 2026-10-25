@@ -24,6 +24,8 @@ import LocationForm from "./LocationForm";
 import {ItineraryPlanner,ItinerarySummary,BackupPanel} from "./JourneyTools";
 import {PlaceProfile,JournalPanel,CustomLocationsPanel} from "./ZiarahPanels";
 
+const CityScene = dynamic(()=>import("./CityScene"),{ssr:false,loading:()=> <div className="map-loading">Menyiapkan kota 3D…</div>});
+
 const RouteSimulator = dynamic(() => import("./RouteSimulator"), { ssr: false });
 
 const WorldMap = dynamic(() => import("./WorldMap"), {
@@ -305,6 +307,8 @@ export default function Game() {
     );
   }
 
+  function startCity(){if(!loaded||!journey.hydrated)return;journey.pause();journey.save();setModal(ready?"city":"party");}
+
   function startPractice() {
     if (!loaded) return;
 
@@ -322,6 +326,7 @@ export default function Game() {
       itinerary={journey.itinerary} onNext={journey.itinerary&&journey.itinerary.index+1<journey.itinerary.stopIds.length?nextDestination:undefined}
       onExit={()=>{journey.pause();journey.save();setSimulatorOpen(false);}} />;
   }
+  if(modal==="city"&&ready)return <CityScene party={party} onExit={()=>setModal(null)}/>;
   if (modal === "drive" && ready) {
     return (
       <DrivingScene
@@ -400,7 +405,7 @@ export default function Game() {
           <Icon name="info" size={22} />
         </button>
 
-        <span className="rail-version">V 0.11</span>
+        <span className="rail-version">V 1.1</span>
       </aside>
 
       <div className="app-content">
@@ -705,6 +710,7 @@ export default function Game() {
                   <Icon name="play" size={18} />
                   {!ready ? "Pilih 2 karakter" : journey.status === "moving" ? "Jeda" : journey.status === "paused" ? "Lanjutkan" : "Berangkat"}
                 </button>
+                <button type="button" className="button secondary full-width" disabled={!loaded||!journey.hydrated} onClick={startCity}>Kota 3D & lalu lintas</button>
                 <button type="button" className="button secondary full-width" disabled={!loaded || locked} onClick={startPractice}>
                   Buka arena latihan
                 </button>
@@ -1024,7 +1030,7 @@ export default function Game() {
 
           <p className="notice">
             Arena latihan memakai jalan fiktif dan model
-            geometris sederhana. Simulator manual menuju maqbarah dibuka melalui panel tujuan. Profil, jurnal, lokasi tambahan, bahan bakar, serta kejadian perjalanan tersedia pada perjalanan rute. Susun beberapa tujuan melalui Rangkaian tujuan. Cadangan progres dapat diunduh dan dipulihkan melalui menu Cadangan. Catat kunjungan melalui profil saat berada di dekat maqbarah. Lokasi tambahan dapat diisi melalui koordinat atau titik pada peta.
+            geometris sederhana. Simulator manual menuju maqbarah dibuka melalui panel tujuan. Profil, jurnal, lokasi tambahan, bahan bakar, serta kejadian perjalanan tersedia pada perjalanan rute. Susun beberapa tujuan melalui Rangkaian tujuan. Cadangan progres dapat diunduh dan dipulihkan melalui menu Cadangan. Saat berkendara, ikuti minimap dan petunjuk tikungan. Menu simulator menyediakan kualitas grafis, kemudi geser, sensitivitas, ukuran tombol, helm karakter, suara perjalanan dan layar penuh. Catat kunjungan melalui profil saat berada di dekat maqbarah. Lokasi tambahan dapat diisi melalui koordinat atau titik pada peta.
           </p>
 
           <p className="muted small">

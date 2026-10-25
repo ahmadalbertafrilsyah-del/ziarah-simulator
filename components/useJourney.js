@@ -1,6 +1,6 @@
 "use client";
 import {allLocations,arrivalEntry,confirmVisit,saveCustom,deleteCustom} from '@/lib/ziarah-journal.mjs';
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {validateJourneyRoute} from '@/lib/journey.mjs';
 import {createRoad,newDriver} from '@/lib/route-drive.mjs';
 import {JOURNEY_KEY,initialJourney,decodeJourney,encodeJourney} from '@/lib/journey-save.mjs';
@@ -79,6 +79,7 @@ export function useJourney(start){
  const removeLocation=id=>{try{update(deleteCustom(live.current,id));return savedResult('Lokasi dihapus. Riwayat kedatangan tetap disimpan.');}catch(e){return {ok:false,message:e.message};}};
  const cancel=()=>{pause();const s=live.current;update({...s,status:'idle',route:null,driver:null,destination:null,itinerary:null,party:[],error:''});save();};
  const traveled=session.driver?.progress||0;
- const position=session.route&&session.driver?createRoad(session.route).toGeo(session.driver):session.origin.coordinates;
+ const activeRoad=useMemo(()=>session.route?createRoad(session.route):null,[session.route]);
+ const position=activeRoad&&session.driver?activeRoad.toGeo(session.driver):session.origin.coordinates;
  return {...session,planStops,nextStop,exportProgress,restoreProgress,itineraryRemaining:itineraryRemaining(session),recordVisit,saveProfileNote,saveVisitNote,saveLocation,removeLocation,locations:allLocations(session),service,hydrated,storageNote,save,report,cancel,position,traveled,remaining:Math.max(0,(session.route?.distanceM||0)-traveled),plan,start:startTravel,pause,clearRoute};
 }
