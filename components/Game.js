@@ -630,7 +630,7 @@ export default function Game() {
                   <progress className="journey-progress" max={journey.route.distanceM} value={journey.traveled} aria-label="Kemajuan perjalanan" />
                   <p className="small muted">{journey.route.source} · Estimasi jalan {Math.ceil(journey.route.durationSec / 60)} menit</p>
                 </>}
-                <p className="small muted">Berangkat membuka perjalanan 3D mengikuti tikungan rute pada peta beranda. Ikuti panah hijau di jalan dengan gas, rem, dan kemudi manual. Bangunan sekitar berupa ilustrasi.</p>
+                <p className="small muted">Berangkat membuka jaringan jalan kota di sekitar Vespa, termasuk cabang jalan dan bangunan berdasarkan data OpenStreetMap. Ikuti panah hijau menuju maqbarah dengan kemudi manual. Kawasan berikutnya dimuat lewat internet.</p>
                 {journey.resources.breakdown&&<p className="journey-error" role="alert">{journey.resources.breakdown.type==='tyre'?'Ban bocor':'Busi mati'}. Buka Inventaris & kondisi kendaraan untuk memperbaiki.</p>}
                 <details><summary>Inventaris & kondisi kendaraan</summary><MaintenancePanel resources={journey.resources} onAction={action=>journey.service(action,party)} disabled={!ready||!journey.hydrated||journey.status==='moving'} canBuy={serviceAccess(journey,'buy-tyre').allowed} /></details>
                 <section className="travel-services" aria-label="Bekal dan layanan simulasi">

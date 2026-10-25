@@ -36,7 +36,7 @@ test('quality presets cap both pixel count and dimensions for portrait, landscap
 });
 test('settings reject corrupt values and preserve chosen controls and quality after roundtrip',()=>{
  const defaults=normalizeRideSettings(null);assert.deepEqual(readRideSettings('bad json'),defaults);assert.deepEqual(normalizeRideSettings({quality:'constructor',sensitivity:NaN,controls:'autopilot',minimap:'yes'}),defaults);
- const chosen={quality:'low',controls:'pad',sensitivity:.8,controlSize:'large',minimap:false,sound:false,volume:.35,helmets:true};assert.deepEqual(readRideSettings(JSON.stringify(chosen)),chosen);
+ const chosen={quality:'low',controls:'pad',sensitivity:.8,controlSize:'large',minimap:false,sound:false,volume:.35,helmets:true,visualStyle:'illustration'};assert.deepEqual(readRideSettings(JSON.stringify(chosen)),chosen);
 
 });
 test('binary segment lookup and local nearest-window agree with known route poses',()=>{

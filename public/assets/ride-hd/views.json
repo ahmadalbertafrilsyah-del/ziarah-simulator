@@ -1,0 +1,134 @@
+{
+  "vespa": {
+    "front": {
+      "width": 298,
+      "height": 492
+    },
+    "back": {
+      "width": 355,
+      "height": 492
+    },
+    "right": {
+      "width": 578,
+      "height": 472
+    },
+    "left": {
+      "width": 579,
+      "height": 459
+    },
+    "top": {
+      "width": 309,
+      "height": 493
+    }
+  },
+  "bapak": {
+    "front": {
+      "width": 310,
+      "height": 496
+    },
+    "back": {
+      "width": 304,
+      "height": 491
+    },
+    "right": {
+      "width": 275,
+      "height": 497
+    },
+    "left": {
+      "width": 280,
+      "height": 496
+    },
+    "top": {
+      "width": 331,
+      "height": 347
+    }
+  },
+  "ibu": {
+    "front": {
+      "width": 269,
+      "height": 496
+    },
+    "back": {
+      "width": 277,
+      "height": 492
+    },
+    "right": {
+      "width": 303,
+      "height": 492
+    },
+    "left": {
+      "width": 320,
+      "height": 489
+    },
+    "top": {
+      "width": 293,
+      "height": 386
+    }
+  },
+  "anak": {
+    "front": {
+      "width": 277,
+      "height": 484
+    },
+    "back": {
+      "width": 269,
+      "height": 488
+    },
+    "right": {
+      "width": 319,
+      "height": 489
+    },
+    "left": {
+      "width": 328,
+      "height": 493
+    },
+    "top": {
+      "width": 277,
+      "height": 461
+    }
+  },
+  "remaja-hijau": {
+    "front": {
+      "width": 261,
+      "height": 499
+    },
+    "back": {
+      "width": 243,
+      "height": 488
+    },
+    "right": {
+      "width": 304,
+      "height": 495
+    },
+    "left": {
+      "width": 312,
+      "height": 495
+    },
+    "top": {
+      "width": 258,
+      "height": 461
+    }
+  },
+  "remaja-terakota": {
+    "front": {
+      "width": 276,
+      "height": 491
+    },
+    "back": {
+      "width": 253,
+      "height": 489
+    },
+    "right": {
+      "width": 315,
+      "height": 491
+    },
+    "left": {
+      "width": 328,
+      "height": 481
+    },
+    "top": {
+      "width": 273,
+      "height": 439
+    }
+  }
+}

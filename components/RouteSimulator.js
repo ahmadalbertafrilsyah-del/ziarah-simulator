@@ -5,6 +5,8 @@ import MaintenancePanel from "./MaintenancePanel";
 import RideNavigation from './RideNavigation';
 import RideControls,{RidePreferences} from './RideControls';
 import {useEffect,useRef,useState,useMemo,useCallback} from 'react';
+import {createStreetWorld} from '@/lib/street-world.mjs';
+import {createStreetLoader} from '@/lib/street-loader.mjs';
 import {createRoad} from '@/lib/route-drive.mjs';
 import {getFacilities,nearbyFacility,serviceLabel} from '@/lib/route-facilities.mjs';
 import {createRouteSimulation} from '@/lib/route-collision.mjs';
@@ -21,7 +23,8 @@ import './route-simulator.css';
 export default function RouteSimulator({route,destination,party,initialDriver,status,onProgress,onPause,onResume,onExit,onService,onProfile,itinerary,onNext,visitJourney,onPark,onRecord,onSummary}){
  const audio=useRef(null),audioPending=useRef(false),lastCue=useRef({arrived:false,breakdown:false});
  const [audioReady,setAudioReady]=useState(false);
- const worldRef=useRef(null),simulation=useRef(null);
+ const worldRef=useRef(null),simulation=useRef(null),streetLoader=useRef(null);
+ const [networkInfo,setNetworkInfo]=useState({status:'loading',message:'Menyiapkan jaringan jalan kota…',roads:0,buildings:0});
  const [stats,setStats]=useState(null);
  const root=useRef(null),canvas=useRef(null),state=useRef(null),config=useRef(null),resizeRef=useRef(null),repaint=useRef(true);
  const controller=useMemo(()=>createRideInput(),[]);
@@ -43,10 +46,13 @@ export default function RouteSimulator({route,destination,party,initialDriver,st
  useEffect(()=>{resizeRef.current?.();},[settings.quality]);
  useEffect(()=>{
   state.current={...initialDriver,speed:0};
+  const streetWorld=createStreetWorld(road);road.streetWorld=streetWorld;
   simulation.current=createRouteSimulation(road,state.current);
   const el=canvas.current;let world;
   try{world=createCityScene(el,party,{player:state.current,vehicles:simulation.current.vehicles},config.current.settings.quality,{road});worldRef.current=world;}catch(e){const t=setTimeout(()=>{setError(e.message);config.current.pauseRuntime();},0);return()=>clearTimeout(t);}
-  const render=(driver,view,party,detail)=>world.render({player:driver,vehicles:simulation.current.vehicles,time:simulation.current.time,helmets:detail.helmets},view,config.current.status==='moving'&&!config.current.menuOpen);
+  const loader=createStreetLoader(road,streetWorld,info=>{setNetworkInfo(info);repaint.current=true;});streetLoader.current=loader;loader.update(state.current);
+  const streamTimer=setInterval(()=>{if(!document.hidden)loader.update(state.current);},1000);
+  const render=(driver,view,party,detail)=>world.render({player:driver,vehicles:simulation.current.vehicles,time:simulation.current.time,helmets:detail.helmets,visualStyle:detail.visualStyle},view,config.current.status==='moving'&&!config.current.menuOpen);
   const resize=()=>{world.qualityChange(config.current.settings.quality);repaint.current=true;};
   resizeRef.current=resize;resize();
   const lost=e=>{e.preventDefault();config.current.pauseRuntime();setError('Konteks grafis terputus. Kembali ke peta lalu buka simulator perjalanan lagi.');};el.addEventListener('webglcontextlost',lost);
@@ -66,7 +72,7 @@ export default function RouteSimulator({route,destination,party,initialDriver,st
    const moving=c.status==='moving'&&!c.menuOpen&&!document.hidden&&!state.current.arrived;
    if(moving){accumulator+=dt;while(accumulator>=1/60){state.current=simulation.current.advance(state.current,controller.read(c.settings.sensitivity),1/60,c.party);accumulator-=1/60;}}else accumulator=0;
    const interval=moving?1000/preset.fps:1000;
-   if(!document.hidden&&(repaint.current||now-draw>=interval)){render(state.current,c.camera,c.party,{...preset,helmets:c.settings.helmets});draw=now-((now-draw)%interval);repaint.current=false;}
+   if(!document.hidden&&(repaint.current||now-draw>=interval)){render(state.current,c.camera,c.party,{...preset,helmets:c.settings.helmets,visualStyle:c.settings.visualStyle});draw=now-((now-draw)%interval);repaint.current=false;}
    if(now-perf>1000){setStats(world.performance());perf=now;}
    if(now-ui>150){
     const soundEnabled=c.settings.sound&&!document.hidden;
@@ -76,7 +82,7 @@ export default function RouteSimulator({route,destination,party,initialDriver,st
    frame=requestAnimationFrame(tick);
   };
   frame=requestAnimationFrame(tick);
-  return()=>{cancelAnimationFrame(frame);el.removeEventListener('webglcontextlost',lost);world.dispose();worldRef.current=null;simulation.current=null;controller.clear();resizeRef.current=null;window.removeEventListener('keydown',key);window.removeEventListener('keyup',key);window.removeEventListener('blur',blur);document.removeEventListener('visibilitychange',hidden);};
+  return()=>{clearInterval(streamTimer);loader.dispose();streetLoader.current=null;if(road.streetWorld===streetWorld)delete road.streetWorld;cancelAnimationFrame(frame);el.removeEventListener('webglcontextlost',lost);world.dispose();worldRef.current=null;simulation.current=null;controller.clear();resizeRef.current=null;window.removeEventListener('keydown',key);window.removeEventListener('keyup',key);window.removeEventListener('blur',blur);document.removeEventListener('visibilitychange',hidden);};
  // Preserve the running physics instance across HUD, camera and preferences updates.
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[route]);
@@ -93,6 +99,7 @@ export default function RouteSimulator({route,destination,party,initialDriver,st
   {!menuOpen&&<RideNavigation road={road} driver={hud} turns={turns} facilities={facilities} showMap={settings.minimap} onToggleMap={()=>changeSettings({...settings,minimap:!settings.minimap})}/>}
   {menuOpen&&<section className="route-menu" id="ride-menu" aria-label="Menu perjalanan">
    <div className="route-menu-heading"><strong>Pengaturan perjalanan</strong><button onClick={()=>setMenuOpen(false)} aria-label="Tutup menu">×</button></div>
+   <section className="street-network-menu" aria-label="Jaringan jalan kota"><strong>Jalan & blok kota asli</strong><p role="status">{networkInfo.message}</p><p>{networkInfo.roads} ruas jalan · {networkInfo.buildings} tapak bangunan dalam kawasan yang dimuat.</p><button disabled={networkInfo.status==='loading'} onClick={()=>streetLoader.current?.retry()}>Muat ulang kawasan</button><p>Anda bisa masuk jalan cabang. Jalur hijau tetap menunjukkan rute awal ke tujuan; belum menghitung ulang rute saat salah belok. Kembali ke jalur melalui jalan yang tersedia atau tombol di bawah.</p><small>Data © OpenStreetMap contributors. Bentuk dan tinggi bangunan disederhanakan. Kawasan lanjutan membutuhkan internet.</small></section>
    <p>Sudut kamera</p>
    <div className="route-cameras">{[['behind','Belakang'],['front','Depan'],['left','Kiri'],['right','Kanan'],['top','Atas']].map(([v,t])=><button key={v} aria-pressed={camera===v} onClick={()=>setCamera(v)}>{t}</button>)}</div>
    <RidePreferences settings={settings} onChange={changeSettings} loaded={settingsLoaded} message={settingsMessage} onFullscreen={toggleFullscreen} fullscreen={fullscreen} onAudio={toggleSound} audioReady={audioReady}/>
@@ -113,11 +120,13 @@ export default function RouteSimulator({route,destination,party,initialDriver,st
     {hud.resources.serviceLog.length>0&&<details><summary>Riwayat layanan ({hud.resources.serviceLog.length})</summary><ol>{hud.resources.serviceLog.slice(-5).reverse().map((entry,i)=><li key={`${entry.clock}-${i}`}>{entry.name} · {serviceLabel(entry.action)} · {clockLabel(entry.clock)}</li>)}</ol></details>}
     <small>Pengisian dan istirahat mengikuti titik layanan. Bantuan darurat tetap bisa dipanggil dari tepi jalan.</small>
    </section>
-   <p className="route-menu-help">Jalan 3D mengikuti rute yang sama dengan peta beranda. Panah hijau menunjukkan arah tujuan pada lajur kiri; kendalikan Vespa secara manual saat menikung. Tahan GAS untuk maju. Kemudi kiri/kanan atau geser mengarahkan Vespa; REM untuk berhenti dan MUNDUR untuk kembali. Melepas kemudi geser mengembalikannya ke tengah.</p>
+   <p className="route-menu-help">Jaringan jalan 3D mengikuti data OpenStreetMap pada kawasan sekitar Vespa. Panah hijau menunjukkan arah tujuan pada lajur kiri; kendalikan Vespa secara manual saat menikung. Tahan GAS untuk maju. Kemudi kiri/kanan atau geser mengarahkan Vespa; REM untuk berhenti dan MUNDUR untuk kembali. Melepas kemudi geser mengembalikannya ke tengah.</p>
   </section>}
+  <div className="street-map-credit"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>{networkInfo.status!=='ready'&&<span role="status"> · {networkInfo.status==='loading'?'Memuat kawasan…':'Kawasan belum lengkap · coba lewat Menu'}</span>}</div>
   <p className="route-instruction">W/↑ gas · A/D/←/→ belok · S/↓/Spasi rem · R mundur · Esc jeda. Ikuti panah hijau dan tikungan rute peta.</p>
   {!menuOpen&&blockedReason(hud.resources,party)&&<p className="route-warning" role="alert">{blockedReason(hud.resources,party)}</p>}
   {!menuOpen&&hud.collision&&!blockedReason(hud.resources,party)&&<p className="route-warning" role="status">{hud.collision}</p>}
+  {!menuOpen&&hud.trafficNotice&&!hud.collision&&!blockedReason(hud.resources,party)&&<p className="route-warning" role="status">{hud.trafficNotice}</p>}
   {hud?.offRoad&&!hud.collision&&!menuOpen&&!blockedReason(hud.resources,party)&&<p className="route-warning">Di luar jalan. Perlambat dan arahkan kembali, atau tekan Kembali ke jalur.</p>}
   {!menuOpen&&status==='arrived'&&!error&&<section className="route-overlay arrival-overlay" role="region" aria-label="Kedatangan di maqbarah"><h2>Tiba di {destination.name}</h2><p>Vespa sudah berhenti di akses tujuan. Parkirkan Vespa, lalu catat kunjungan sebelum menyiapkan perjalanan berikutnya.</p>
    {visitJourney&&<VisitActions journey={visitJourney} place={destination} party={party} onPark={onPark} onRecord={onRecord}/>}
