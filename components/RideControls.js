@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {padSteering} from '@/lib/ride-input.mjs';
 import {QUALITY_PRESETS} from '@/lib/ride-settings.mjs';
+import './ride-art-controls.css';
 function SteeringPad({controller,disabled}){
  const [value,setValue]=useState(0),pointer=useRef(null);
  useEffect(()=>()=>{if(pointer.current!==null)controller.release(`pad:${pointer.current}`);controller.release('pad:keyboard');},[controller]);
@@ -17,7 +18,7 @@ export default function RideControls({controller,status,settings}){
  const [held,setHeld]=useState({});const owned=useRef(new Set());
  useEffect(()=>{const sources=owned.current;return()=>{for(const source of sources)controller.release(source);};},[controller]);
  function release(e){const source=`touch:${e.pointerId}`;controller.release(source);owned.current.delete(source);setHeld(old=>{const next={...old};delete next[source];return next;});}
- function button(action,label){return <button type="button" aria-label={action==='left'?'Belok kiri':action==='right'?'Belok kanan':label} aria-pressed={Object.values(held).includes(action)} disabled={status!=='moving'} onPointerDown={e=>{if(status!=='moving')return;e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);const source=`touch:${e.pointerId}`;owned.current.add(source);controller.press(action,source);setHeld(old=>({...old,[source]:action}));}} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}>{label}</button>;}
+ function button(action,label){const icon={left:'left',right:'right',gas:'up',reverse:'down',brake:'blank'}[action];return <button type="button" className={'ride-art-button ride-art-'+action} aria-label={action==='left'?'Belok kiri':action==='right'?'Belok kanan':label} aria-pressed={Object.values(held).includes(action)} disabled={status!=='moving'} onPointerDown={e=>{if(status!=='moving')return;e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);const source=`touch:${e.pointerId}`;owned.current.add(source);controller.press(action,source);setHeld(old=>({...old,[source]:action}));}} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}><img src={'/assets/controls/'+icon+'.png'} alt="" draggable={false}/><span>{action==='left'?'KIRI':action==='right'?'KANAN':label}</span></button>;}
  return <footer className={'route-touch control-size-'+settings.controlSize} aria-label="Kontrol berkendara"><div>{settings.controls==='pad'?<SteeringPad controller={controller} disabled={status!=='moving'}/>:<>{button('left','←')}{button('right','→')}</>}</div><div>{button('reverse','MUNDUR')}{button('brake','REM')}{button('gas','GAS')}</div></footer>;
 }
 export function RidePreferences({settings,onChange,loaded,message,onFullscreen,fullscreen,onAudio,audioReady}){

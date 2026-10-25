@@ -1,0 +1,10 @@
+.route-screen .route-touch .ride-art-button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:end;gap:1px;width:76px;height:86px;min-width:0;min-height:0;padding:0;border:0;border-radius:12px;background:transparent!important;color:#fff9e4;font-size:10px!important;text-shadow:0 1px 3px #182f24;box-shadow:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.ride-art-button img{width:100%;height:calc(100% - 16px);object-fit:contain;pointer-events:none;filter:drop-shadow(0 3px 2px #132d2944)}
+.ride-art-button span{font-size:10px;line-height:15px;letter-spacing:.5px;pointer-events:none;background:#244a3bc9;border-radius:5px;padding:0 5px}
+.route-screen .route-touch .ride-art-gas{height:101px;width:88px}
+.route-screen .route-touch .ride-art-button[aria-pressed=true]{transform:translateY(3px) scale(.95);filter:brightness(1.2)}
+.route-screen .route-touch .ride-art-button:focus-visible{outline:3px solid #fff2b8;outline-offset:3px}
+.route-screen .route-touch.control-size-large .ride-art-button{width:86px;height:97px}.route-screen .route-touch.control-size-large .ride-art-gas{width:98px;height:110px}
+@media(max-width:600px){.route-screen .route-touch .ride-art-button{width:52px;height:65px}.route-screen .route-touch .ride-art-gas{width:59px;height:76px}.ride-art-button span{font-size:8px;line-height:13px}.route-screen .route-touch.control-size-large .ride-art-button{width:57px;height:73px}.route-screen .route-touch.control-size-large .ride-art-gas{width:65px;height:84px}}
+@media(max-width:359px){.route-screen .route-touch .ride-art-button{width:46px}.route-screen .route-touch .ride-art-gas{width:52px}.route-screen .route-touch.control-size-large .ride-art-button{width:49px}.route-screen .route-touch.control-size-large .ride-art-gas{width:56px}}
+@media(max-height:480px){.route-screen .route-touch .ride-art-button{height:58px;width:55px}.route-screen .route-touch .ride-art-gas{height:68px;width:63px}.route-screen .route-touch.control-size-large .ride-art-button{height:64px;width:62px}.route-screen .route-touch.control-size-large .ride-art-gas{height:74px;width:70px}}
