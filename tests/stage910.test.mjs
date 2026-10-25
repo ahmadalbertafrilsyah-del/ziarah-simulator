@@ -30,7 +30,7 @@ test('arrival gates next leg, preserves supplies and selected pair, and stops at
 });
 test('schema six restores itinerary index and active pose; future custom stops cannot be removed or edited',()=>{
  const s=planned();assert.throws(()=>deleteCustom(s,second.id));assert.throws(()=>saveCustom(s,{...second,name:'Khác'}));
- const next=nextItineraryLeg({...s,status:'arrived',origin:first},allLocations(s));const restored=decodeJourney(encodeJourney({...next,status:'moving'}),origin);assert.equal(restored.status,'paused');assert.equal(restored.itinerary.index,1);assert.equal(restored.destination.id,second.id);assert.deepEqual(restored.itinerary.stopIds,[first.id,second.id]);
+ const next=nextItineraryLeg({...s,status:'arrived',origin:first},allLocations(s));const legacy=JSON.parse(encodeJourney({...next,status:'moving'}));legacy.version=6;delete legacy.parking;const restored=decodeJourney(JSON.stringify(legacy),origin);assert.equal(restored.status,'paused');assert.equal(restored.itinerary.index,1);assert.equal(restored.destination.id,second.id);assert.deepEqual(restored.itinerary.stopIds,[first.id,second.id]);
  const broken=JSON.parse(encodeJourney(s));broken.itinerary.index=1;assert.throws(()=>decodeJourney(JSON.stringify(broken),origin));broken.itinerary.index=0;broken.itinerary.legRoutes[1].coordinates[0]=[100,-7];assert.throws(()=>decodeJourney(JSON.stringify(broken),origin));
  const old=JSON.parse(encodeJourney(base()));old.version=5;delete old.itinerary;assert.equal(decodeJourney(JSON.stringify(old),origin).itinerary,null);
 });
@@ -44,7 +44,7 @@ test('corrupt, oversized, unrelated and incompatible backups fail before any sto
 });
 test('restore persistence commits both keys and rolls back party if journey storage is full',()=>{
  const backup=inspectBackup(createBackup(planned(),pair),origin),oldJourney=encodeJourney(base()),oldParty=JSON.stringify({version:1,ids:['anak','ibu']});
- const s=storage({[JOURNEY_KEY]:oldJourney,[PARTY_STORAGE_KEY]:oldParty});persistBackup(s,backup);assert.equal(JSON.parse(s.getItem(JOURNEY_KEY)).version,6);assert.deepEqual(JSON.parse(s.getItem(PARTY_STORAGE_KEY)).ids,pair);
+ const s=storage({[JOURNEY_KEY]:oldJourney,[PARTY_STORAGE_KEY]:oldParty});persistBackup(s,backup);assert.equal(JSON.parse(s.getItem(JOURNEY_KEY)).version,7);assert.deepEqual(JSON.parse(s.getItem(PARTY_STORAGE_KEY)).ids,pair);
  const blocked=storage({[JOURNEY_KEY]:oldJourney,[PARTY_STORAGE_KEY]:oldParty},k=>k===JOURNEY_KEY);assert.throws(()=>persistBackup(blocked,backup),/Progres lama dipertahankan/);assert.equal(blocked.getItem(JOURNEY_KEY),oldJourney);assert.equal(blocked.getItem(PARTY_STORAGE_KEY),oldParty);
  const empty=storage({[JOURNEY_KEY]:oldJourney},k=>k===JOURNEY_KEY);assert.throws(()=>persistBackup(empty,backup));assert.equal(empty.getItem(PARTY_STORAGE_KEY),null);
 });

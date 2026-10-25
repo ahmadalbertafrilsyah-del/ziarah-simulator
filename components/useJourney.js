@@ -1,5 +1,6 @@
 "use client";
-import {allLocations,arrivalEntry,confirmVisit,saveCustom,deleteCustom} from '@/lib/ziarah-journal.mjs';
+import {parkForVisit,recordParkedVisit,canContinueFromStop,visitMilestones} from '@/lib/visit-flow.mjs';
+import {allLocations,arrivalEntry,saveCustom,deleteCustom} from '@/lib/ziarah-journal.mjs';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {validateJourneyRoute} from '@/lib/journey.mjs';
 import {createRoad,newDriver} from '@/lib/route-drive.mjs';
@@ -48,13 +49,13 @@ export function useJourney(start){
   }catch(e){const message=e.name==='AbortError'?'Layanan rute melewati batas waktu. Coba lagi.':e.message;if(request.current===controller)update({...live.current,status:'error',error:message});return {ok:false,message};}
   finally{clearTimeout(timeout);if(request.current===controller)request.current=null;}
  }
- function nextStop(){try{update(nextItineraryLeg(live.current,allLocations(live.current)));const persisted=save();return {ok:true,message:persisted?'Tujuan berikutnya siap. Tekan Berangkat untuk melanjutkan.':'Tujuan berikutnya siap, tetapi kemajuan belum tersimpan.'};}catch(e){return {ok:false,message:e.message};}}
+ function nextStop(){try{const active=live.current;if(active.destination&&!canContinueFromStop(active))throw Error('Parkir dan catat kunjungan di tujuan ini sebelum melanjutkan rangkaian.');update(nextItineraryLeg(live.current,allLocations(live.current)));const persisted=save();return {ok:true,message:persisted?'Tujuan berikutnya siap. Tekan Berangkat untuk melanjutkan.':'Tujuan berikutnya siap, tetapi kemajuan belum tersimpan.'};}catch(e){return {ok:false,message:e.message};}}
  function exportProgress(party){if(!hydrated)throw Error('Tunggu progres selesai dimuat.');pause();save();return createBackup(live.current,party);}
  function restoreProgress(raw){
   if(!hydrated||live.current.status==='loading')return {ok:false,message:'Tunggu pemuatan atau penghitungan rute selesai.'};
   try{const backup=inspectBackup(raw,start);persistBackup(localStorage,backup);request.current?.abort();request.current=null;update(backup.session);setStorageNote('Cadangan berhasil dipulihkan');return {ok:true,party:backup.selectedParty,origin:backup.session.origin,message:'Cadangan dipulihkan. Perjalanan aktif dijeda dan dapat dilanjutkan.'};}catch(e){return {ok:false,message:e.message};}
  }
- function startTravel(party){const s=live.current;if(s.route&&['ready','paused'].includes(s.status)&&isValidParty(s.party.length?s.party:party)){update({...s,party:s.party.length?s.party:[...party],status:'moving'});save();}}
+ function startTravel(party){const s=live.current;if(s.route&&['ready','paused'].includes(s.status)&&isValidParty(s.party.length?s.party:party)){update({...s,party:s.party.length?s.party:[...party],parking:null,status:'moving'});save();}}
  const report=useCallback(driver=>{
   const s=live.current;if(s.status!=='moving')return;
   if(!validResources(driver.resources))return;
@@ -72,14 +73,15 @@ export function useJourney(start){
   update({...s,resources:result.resources,driver:s.driver?{...s.driver,speed:0,resources:result.resources}:null});save();return result;
  },[update,save]);
  const savedResult=message=>{const persisted=save();return {ok:true,persisted,message:persisted?message:'Perubahan diterapkan, tetapi belum tersimpan. Penyimpanan browser penuh atau tidak tersedia.'};};
- const recordVisit=(locationId,selectedParty)=>{const s=live.current;try{const place=allLocations(s).find(p=>p.id===locationId),pair=s.party.length?s.party:selectedParty;update(confirmVisit(s,place,pair,new Date().toISOString(),crypto.randomUUID()));return savedResult('Kunjungan dicatat di jurnal.');}catch(e){return {ok:false,message:e.message};}};
+ const parkVisit=(locationId,selectedParty)=>{const s=live.current;try{const place=allLocations(s).find(p=>p.id===locationId),pair=s.party.length?s.party:selectedParty;update(parkForVisit(s,place,pair));return savedResult('Vespa diparkir. Kunjungan siap dicatat.');}catch(e){return {ok:false,message:e.message};}};
+ const recordVisit=(locationId,selectedParty)=>{const s=live.current;try{const place=allLocations(s).find(p=>p.id===locationId),pair=s.party.length?s.party:selectedParty,next=recordParkedVisit(s,place,pair,new Date().toISOString(),crypto.randomUUID()),newlyCompleted=!visitMilestones(s).complete&&visitMilestones(next).complete;update(next);return {...savedResult('Kunjungan dicatat di jurnal.'),newlyCompleted};}catch(e){return {ok:false,message:e.message};}};
  const saveProfileNote=(id,note)=>{const s=live.current;if(!allLocations(s).some(p=>p.id===id))return {ok:false,message:'Lokasi tidak ditemukan.'};if(typeof note!=='string'||note.length>6000)return {ok:false,message:'Catatan maksimal 6.000 karakter.'};update({...s,profileNotes:{...s.profileNotes,[id]:note.trim()}});return savedResult('Catatan pribadi disimpan.');};
  const saveVisitNote=(id,note)=>{const s=live.current;if(typeof note!=='string'||note.length>6000||!s.visits.some(v=>v.id===id))return {ok:false,message:'Catatan kunjungan tidak valid.'};update({...s,visits:s.visits.map(v=>v.id===id?{...v,note:note.trim()}:v)});return savedResult('Catatan jurnal disimpan.');};
  const saveLocation=input=>{try{update(saveCustom(live.current,input));return savedResult('Lokasi tambahan disimpan.');}catch(e){return {ok:false,message:e.message};}};
  const removeLocation=id=>{try{update(deleteCustom(live.current,id));return savedResult('Lokasi dihapus. Riwayat kedatangan tetap disimpan.');}catch(e){return {ok:false,message:e.message};}};
- const cancel=()=>{pause();const s=live.current;update({...s,status:'idle',route:null,driver:null,destination:null,itinerary:null,party:[],error:''});save();};
+ const cancel=()=>{pause();const s=live.current;update({...s,status:'idle',route:null,driver:null,destination:null,itinerary:null,party:[],parking:null,error:''});save();};
  const traveled=session.driver?.progress||0;
  const activeRoad=useMemo(()=>session.route?createRoad(session.route):null,[session.route]);
  const position=activeRoad&&session.driver?activeRoad.toGeo(session.driver):session.origin.coordinates;
- return {...session,planStops,nextStop,exportProgress,restoreProgress,itineraryRemaining:itineraryRemaining(session),recordVisit,saveProfileNote,saveVisitNote,saveLocation,removeLocation,locations:allLocations(session),service,hydrated,storageNote,save,report,cancel,position,traveled,remaining:Math.max(0,(session.route?.distanceM||0)-traveled),plan,start:startTravel,pause,clearRoute};
+ return {...session,planStops,nextStop,exportProgress,restoreProgress,itineraryRemaining:itineraryRemaining(session),parkVisit,recordVisit,saveProfileNote,saveVisitNote,saveLocation,removeLocation,locations:allLocations(session),service,hydrated,storageNote,save,report,cancel,position,traveled,remaining:Math.max(0,(session.route?.distanceM||0)-traveled),plan,start:startTravel,pause,clearRoute};
 }

@@ -1,4 +1,6 @@
 "use client";
+import {VisitActions} from './VisitFlow';
+import {canContinueFromStop} from '@/lib/visit-flow.mjs';
 import MaintenancePanel from "./MaintenancePanel";
 import RideNavigation from './RideNavigation';
 import RideControls,{RidePreferences} from './RideControls';
@@ -16,7 +18,7 @@ import {DEFAULT_RIDE_SETTINGS,QUALITY_PRESETS,RIDE_SETTINGS_KEY,readRideSettings
 import {CHARACTERS,ASSET,distanceLabel} from '@/lib/catalog.mjs';
 import './driving.css';
 import './route-simulator.css';
-export default function RouteSimulator({route,destination,party,initialDriver,status,onProgress,onPause,onResume,onExit,onService,onProfile,itinerary,onNext}){
+export default function RouteSimulator({route,destination,party,initialDriver,status,onProgress,onPause,onResume,onExit,onService,onProfile,itinerary,onNext,visitJourney,onPark,onRecord,onSummary}){
  const audio=useRef(null),audioPending=useRef(false),lastCue=useRef({arrived:false,breakdown:false});
  const [audioReady,setAudioReady]=useState(false);
  const worldRef=useRef(null),simulation=useRef(null);
@@ -111,13 +113,17 @@ export default function RouteSimulator({route,destination,party,initialDriver,st
     {hud.resources.serviceLog.length>0&&<details><summary>Riwayat layanan ({hud.resources.serviceLog.length})</summary><ol>{hud.resources.serviceLog.slice(-5).reverse().map((entry,i)=><li key={`${entry.clock}-${i}`}>{entry.name} · {serviceLabel(entry.action)} · {clockLabel(entry.clock)}</li>)}</ol></details>}
     <small>Pengisian dan istirahat mengikuti titik layanan. Bantuan darurat tetap bisa dipanggil dari tepi jalan.</small>
    </section>
-   <p className="route-menu-help">Tahan GAS untuk maju. Kemudi kiri/kanan atau geser mengarahkan Vespa; REM untuk berhenti dan MUNDUR untuk kembali. Melepas kemudi geser mengembalikannya ke tengah.</p>
+   <p className="route-menu-help">Jalan 3D mengikuti rute yang sama dengan peta beranda. Panah hijau menunjukkan arah tujuan pada lajur kiri; kendalikan Vespa secara manual saat menikung. Tahan GAS untuk maju. Kemudi kiri/kanan atau geser mengarahkan Vespa; REM untuk berhenti dan MUNDUR untuk kembali. Melepas kemudi geser mengembalikannya ke tengah.</p>
   </section>}
-  <p className="route-instruction">W/↑ gas · A/D/←/→ belok · S/↓/Spasi rem · R mundur · Esc jeda. Ikuti tikungan jalan.</p>
+  <p className="route-instruction">W/↑ gas · A/D/←/→ belok · S/↓/Spasi rem · R mundur · Esc jeda. Ikuti panah hijau dan tikungan rute peta.</p>
   {!menuOpen&&blockedReason(hud.resources,party)&&<p className="route-warning" role="alert">{blockedReason(hud.resources,party)}</p>}
   {!menuOpen&&hud.collision&&!blockedReason(hud.resources,party)&&<p className="route-warning" role="status">{hud.collision}</p>}
   {hud?.offRoad&&!hud.collision&&!menuOpen&&!blockedReason(hud.resources,party)&&<p className="route-warning">Di luar jalan. Perlambat dan arahkan kembali, atau tekan Kembali ke jalur.</p>}
-  {!menuOpen&&(status!=='moving'||error)&&<div className="route-overlay" role="status"><h2>{error?'Arena belum tersedia':status==='arrived'?`Tiba di ${destination.name}`:hud.resources.breakdown?'Gangguan kendaraan':'Perjalanan dijeda'}</h2><p>{error||(status==='arrived'?(onNext?'Berhenti di tujuan ini. Catat kunjungan atau siapkan tujuan berikutnya.':itinerary?'Seluruh tujuan dalam rangkaian sudah dicapai. Catat kunjungan melalui profil.':'Perjalanan selesai. Catat kunjungan melalui profil tujuan.'):'Perjalanan dijeda. Kemajuan disimpan jika penyimpanan browser tersedia.')}</p>{status==='paused'&&!error&&(hud.resources.breakdown?<button onClick={toggleMenu}>Tangani kendaraan</button>:<button onClick={onResume}>Lanjutkan berkendara</button>)}{status==='arrived'&&onNext&&<button onClick={onNext}>Siapkan tujuan berikutnya</button>}{status==='arrived'&&<button onClick={onProfile}>Buka profil & catat kunjungan</button>}<button onClick={exitNow}>Kembali ke peta</button></div>}
+  {!menuOpen&&status==='arrived'&&!error&&<section className="route-overlay arrival-overlay" role="region" aria-label="Kedatangan di maqbarah"><h2>Tiba di {destination.name}</h2><p>Vespa sudah berhenti di akses tujuan. Parkirkan Vespa, lalu catat kunjungan sebelum menyiapkan perjalanan berikutnya.</p>
+   {visitJourney&&<VisitActions journey={visitJourney} place={destination} party={party} onPark={onPark} onRecord={onRecord}/>}
+   <div className="arrival-actions">{onNext&&<button disabled={!visitJourney||!canContinueFromStop(visitJourney)} onClick={onNext}>Siapkan tujuan berikutnya</button>}<button onClick={onProfile}>Buka profil tujuan</button>{onSummary&&<button onClick={onSummary}>Ringkasan ziarah</button>}<button onClick={exitNow}>Kembali ke peta</button></div>
+  </section>}
+  {!menuOpen&&(status!=='moving'&&status!=='arrived'||error)&&<div className="route-overlay" role="status"><h2>{error?'Arena belum tersedia':hud.resources.breakdown?'Gangguan kendaraan':'Perjalanan dijeda'}</h2><p>{error||'Perjalanan dijeda. Kemajuan disimpan jika penyimpanan browser tersedia.'}</p>{status==='paused'&&!error&&(hud.resources.breakdown?<button onClick={toggleMenu}>Tangani kendaraan</button>:<button onClick={onResume}>Lanjutkan berkendara</button>)}<button onClick={exitNow}>Kembali ke peta</button></div>}
   {!menuOpen&&status!=='arrived'&&near&&!hud.collision&&<div className="facility-hint"><button disabled={Math.abs(hud.speed)>.5} onClick={enterFacility}>{Math.abs(hud.speed)>.5?'Berhenti dekat ': 'Masuk '}{near.name}{Math.abs(hud.speed)<=.5?' · E':''}</button></div>}
   {!menuOpen&&<RideControls key={`${status}-${settings.controls}-${settings.controlSize}`} controller={controller} status={error?'paused':status} settings={settings}/>}
  </main>;

@@ -13,6 +13,8 @@ import {
 } from "@/lib/party.mjs";
 
 import Icon from "./Icon";
+import {JourneySummary} from "./VisitFlow";
+import {visitMilestones} from "@/lib/visit-flow.mjs";
 import MaintenancePanel from "./MaintenancePanel";
 import {serviceAccess} from "@/lib/route-facilities.mjs";
 
@@ -199,10 +201,13 @@ export default function Game() {
   const ready = isValidParty(party);
   const journey = useJourney(START);
   const mapRoute=useMemo(()=>itineraryMapRoute({route:journey.route,itinerary:journey.itinerary}),[journey.route,journey.itinerary]);
+  const milestones=visitMilestones(journey);
   const selected = journey.destination || journey.locations.find(place=>place.id===selectedId) || START;
   const locked = journey.status === "moving" || journey.status === "paused";
 
   function openProfile(id){setProfileId(id);setModal('profile');}
+  function openSummary(){journey.pause();journey.save();setSimulatorOpen(false);setModal('completion');}
+  function recordAtStop(id){const result=journey.recordVisit(id,party);if(result.ok&&result.newlyCompleted){setSimulatorOpen(false);setModal('completion');}return result;}
   function addLocation(){setLocationDraft(null);setModal('location-form');}
   function saveLocation(place){const result=journey.saveLocation(place);if(result.ok){journey.clearRoute();setSelectedId(place.id);setModal(null);setToast(result.message);setFocusRequest({coordinates:place.coordinates,zoom:13,nonce:Date.now()});}return result;}
   function pickLocation(coordinates){if(!placing)return;setLocationDraft(d=>({...d,coordinates}));setPlacing(false);setModal('location-form');}
@@ -231,7 +236,7 @@ export default function Game() {
   const arrivedName = journey.destination?.name;
   useEffect(() => {
     if (journeyStatus !== "arrived") return;
-    const timer = setTimeout(() => setToast(`Tiba di ${arrivedName}. Buka profil untuk mencatat kunjungan atau siapkan tujuan berikutnya.`), 0);
+    const timer = setTimeout(() => setToast(`Tiba di ${arrivedName}. Parkirkan Vespa lalu catat kunjungan sebelum melanjutkan.`), 0);
     return () => clearTimeout(timer);
   }, [journeyStatus, arrivedName]);
 
@@ -323,6 +328,7 @@ export default function Game() {
       initialDriver={journey.driver} party={journey.party} status={journey.status}
       onProgress={journey.report} onPause={journey.pause} onService={action=>journey.service(action,party)}
       onResume={()=>journey.start(party)} onProfile={destinationProfile}
+      visitJourney={journey} onPark={()=>journey.parkVisit(journey.destination.id,party)} onRecord={()=>recordAtStop(journey.destination.id)} onSummary={openSummary}
       itinerary={journey.itinerary} onNext={journey.itinerary&&journey.itinerary.index+1<journey.itinerary.stopIds.length?nextDestination:undefined}
       onExit={()=>{journey.pause();journey.save();setSimulatorOpen(false);}} />;
   }
@@ -624,7 +630,7 @@ export default function Game() {
                   <progress className="journey-progress" max={journey.route.distanceM} value={journey.traveled} aria-label="Kemajuan perjalanan" />
                   <p className="small muted">{journey.route.source} · Estimasi jalan {Math.ceil(journey.route.durationSec / 60)} menit</p>
                 </>}
-                <p className="small muted">Berangkat membuka simulator manual. Gunakan gas, rem, kemudi kiri/kanan dan mundur. Jalan mengikuti rute terpilih; bangunan sekitar berupa ilustrasi.</p>
+                <p className="small muted">Berangkat membuka perjalanan 3D mengikuti tikungan rute pada peta beranda. Ikuti panah hijau di jalan dengan gas, rem, dan kemudi manual. Bangunan sekitar berupa ilustrasi.</p>
                 {journey.resources.breakdown&&<p className="journey-error" role="alert">{journey.resources.breakdown.type==='tyre'?'Ban bocor':'Busi mati'}. Buka Inventaris & kondisi kendaraan untuk memperbaiki.</p>}
                 <details><summary>Inventaris & kondisi kendaraan</summary><MaintenancePanel resources={journey.resources} onAction={action=>journey.service(action,party)} disabled={!ready||!journey.hydrated||journey.status==='moving'} canBuy={serviceAccess(journey,'buy-tyre').allowed} /></details>
                 <section className="travel-services" aria-label="Bekal dan layanan simulasi">
@@ -705,14 +711,14 @@ export default function Game() {
 
               <div className="departure-panel">
                 <button type="button" className="button primary departure-button"
-                  disabled={!loaded || !journey.hydrated || !!journey.resources.breakdown || (ready && !["ready", "moving", "paused"].includes(journey.status))}
+                  disabled={!loaded || !journey.hydrated || !!journey.resources.breakdown || (ready && !["ready", "moving", "paused", "arrived"].includes(journey.status))}
                   onClick={() => journey.status === "moving" ? journey.pause() : depart()}>
                   <Icon name="play" size={18} />
-                  {!ready ? "Pilih 2 karakter" : journey.status === "moving" ? "Jeda" : journey.status === "paused" ? "Lanjutkan" : "Berangkat"}
+                  {!ready ? "Pilih 2 karakter" : journey.status === "moving" ? "Jeda" : journey.status === "paused" ? "Lanjutkan" : journey.status === "arrived" ? "Proses kunjungan" : "Berangkat"}
                 </button>
-                <button type="button" className="button secondary full-width" disabled={!loaded||!journey.hydrated} onClick={startCity}>Kota 3D & lalu lintas</button>
+                <button type="button" className="button secondary full-width" disabled={!loaded||!journey.hydrated} onClick={startCity}>Arena kota 3D & lalu lintas</button>
                 <button type="button" className="button secondary full-width" disabled={!loaded || locked} onClick={startPractice}>
-                  Buka arena latihan
+                  Latihan kontrol · jalan lurus
                 </button>
 
                 {ready && (
@@ -890,12 +896,12 @@ export default function Game() {
               </div>
 
               <div className="visit-count">
-                <strong>09</strong>
+                <strong>{milestones.count}/9</strong>
 
                 <p>
-                  Maqbarah Walisongo
+                  Kunjungan sudah dicatat
                   <br />
-                  menanti untuk dikenali
+                  termasuk lokasi awal
                 </p>
               </div>
 
@@ -904,11 +910,7 @@ export default function Game() {
                   <button
                     key={place.id}
                     type="button"
-                    className={
-                      selectedId === place.id
-                        ? "selected"
-                        : ""
-                    }
+                    className={(selectedId===place.id?'selected ':'')+(milestones.places.find(p=>p.id===place.id)?.completed?'is-completed':'')}
                     aria-pressed={selectedId === place.id}
                     aria-label={`Lihat ${place.name}`}
                     title={place.name}
@@ -926,6 +928,8 @@ export default function Game() {
                   </button>
                 ))}
               </div>
+              <p className="small">{milestones.complete?'Sembilan maqbarah sudah dicatat.':`${9-milestones.count} maqbarah belum dicatat. Parkir dan catat kunjungan di setiap lokasi.`}</p>
+              <button type="button" className="button secondary full-width" disabled={!journey.hydrated} onClick={openSummary}>{milestones.complete?'Lihat ringkasan selesai':'Lihat progres sembilan maqbarah'}</button>
             </article>
           </section>
 
@@ -977,8 +981,9 @@ export default function Game() {
 
       {modal==='itinerary'&&<Modal title="Rangkaian tujuan" onClose={()=>setModal(null)}><ItineraryPlanner journey={journey} selectedId={selected.id} onPlanned={message=>{setModal(null);setToast(message);}}/></Modal>}
       {modal==='backup'&&<Modal title="Cadangan progres" onClose={()=>setModal(null)}><BackupPanel journey={journey} party={party} start={START} onRestored={restoredProgress}/></Modal>}
-      {modal==='profile'&&journey.locations.some(p=>p.id===profileId)&&<Modal title="Profil maqbarah" onClose={()=>setModal(null)}><PlaceProfile key={profileId} place={journey.locations.find(p=>p.id===profileId)} journey={journey} party={party}/></Modal>}
-      {modal==='journal'&&<Modal title="Jurnal kunjungan" onClose={()=>setModal(null)}><JournalPanel journey={journey} onProfile={openProfile}/></Modal>}
+      {modal==='profile'&&journey.locations.some(p=>p.id===profileId)&&<Modal title="Profil maqbarah" onClose={()=>setModal(null)}><PlaceProfile key={profileId} place={journey.locations.find(p=>p.id===profileId)} journey={{...journey,recordVisit:recordAtStop}} party={party}/></Modal>}
+      {modal==='completion'&&<Modal title="Ringkasan ziarah" onClose={()=>setModal(null)}><JourneySummary journey={journey} onProfile={openProfile} onJournal={()=>setModal('journal')}/></Modal>}
+      {modal==='journal'&&<Modal title="Jurnal kunjungan" onClose={()=>setModal(null)}><JournalPanel journey={journey} onProfile={openProfile} onSummary={openSummary}/></Modal>}
       {modal==='locations'&&<Modal title="Lokasi ziarah tambahan" onClose={()=>setModal(null)}><CustomLocationsPanel journey={journey} onAdd={addLocation} onEdit={p=>{setLocationDraft(p);setModal('location-form');}} onProfile={openProfile}/></Modal>}
       {modal==='location-form'&&<Modal title={journey.customLocations.some(p=>p.id===locationDraft?.id)?'Edit maqbarah':'Tambah maqbarah'} onClose={()=>setModal(null)}><LocationForm initial={locationDraft} onSave={saveLocation} onCancel={()=>setModal(null)} onPickMap={draft=>{setLocationDraft(draft);setModal(null);setPlacing(true);}}/></Modal>}
 

@@ -5,10 +5,11 @@ import {MAX_STOPS} from '@/lib/itinerary.mjs';
 import {BACKUP_LIMIT,inspectBackup} from '@/lib/game-backup.mjs';
 import {clockLabel,METERS_PER_LITER} from '@/lib/travel-resources.mjs';
 import './journey-tools.css';
+import {canContinueFromStop} from '@/lib/visit-flow.mjs';
 export function ItinerarySummary({journey,onNext}){
  const t=journey.itinerary;if(!t)return null;
  const hasNext=t.index+1<t.stopIds.length;
- return <section className="itinerary-summary" aria-label="Rangkaian perjalanan aktif"><strong>Tujuan {t.index+1} dari {t.stopIds.length}</strong><ol>{t.stopIds.map((id,i)=><li key={id} className={i===t.index?'current-stop':''}>{journey.locations.find(p=>p.id===id)?.name}{i<t.index?' · sudah tiba':i===t.index?(journey.status==='arrived'?' · sudah tiba':' · tujuan aktif'):''}</li>)}</ol><p>Sisa seluruh rangkaian: {distanceLabel(journey.itineraryRemaining)} · Perkiraan bensin {(journey.itineraryRemaining/METERS_PER_LITER).toFixed(2)} L</p>{journey.itineraryRemaining/METERS_PER_LITER>journey.resources.fuel&&<p>Perkiraan bensin melebihi isi tangki saat ini. Rencanakan berhenti di SPBU simulasi.</p>}{journey.status==='arrived'&&(hasNext?<button type="button" className="button primary" onClick={onNext}>Siapkan tujuan berikutnya</button>:<p role="status">Seluruh tujuan dalam rangkaian sudah dicapai. Konfirmasi kunjungan melalui profil masing-masing.</p>)}</section>;
+ return <section className="itinerary-summary" aria-label="Rangkaian perjalanan aktif"><strong>Tujuan {t.index+1} dari {t.stopIds.length}</strong><ol>{t.stopIds.map((id,i)=><li key={id} className={i===t.index?'current-stop':''}>{journey.locations.find(p=>p.id===id)?.name}{i<t.index?' · sudah tiba':i===t.index?(journey.status==='arrived'?' · sudah tiba':' · tujuan aktif'):''}</li>)}</ol><p>Sisa seluruh rangkaian: {distanceLabel(journey.itineraryRemaining)} · Perkiraan bensin {(journey.itineraryRemaining/METERS_PER_LITER).toFixed(2)} L</p>{journey.itineraryRemaining/METERS_PER_LITER>journey.resources.fuel&&<p>Perkiraan bensin melebihi isi tangki saat ini. Rencanakan berhenti di SPBU simulasi.</p>}{journey.status==='arrived'&&(hasNext?<button type="button" className="button primary" disabled={!canContinueFromStop(journey)} onClick={onNext}>Siapkan tujuan berikutnya</button>:<p role="status">Seluruh tujuan dalam rangkaian sudah dicapai. Parkir dan catat kunjungan terakhir melalui profil atau simulator.</p>)}</section>;
 }
 export function ItineraryPlanner({journey,selectedId,onPlanned}){
  const t=journey.itinerary,offset=t?t.index+(journey.status==='arrived'?1:0):0;
